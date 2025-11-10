@@ -12,14 +12,12 @@ DEFAULT_MODULES = [
     "interactive",
 ]
 
-CACHE_DIR = platformdirs.user_cache_path("skland-api")
-CACHE_DIR.mkdir(exist_ok=True)
+CACHE_DIR = platformdirs.user_cache_path("skland-api", ensure_exists=True)
 LOG_FILE = CACHE_DIR / "skland-api.log"
 
 ITEM_MAPPING: dict[str, str]
 
-CONFIG_DIR = platformdirs.user_config_path("skland-api")
-CONFIG_DIR.mkdir(exist_ok=True)
+CONFIG_DIR = platformdirs.user_config_path("skland-api", ensure_exists=True)
 AUTH_FILE = CONFIG_DIR / "auth.json"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
