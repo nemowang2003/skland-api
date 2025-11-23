@@ -1,11 +1,10 @@
-from ..character_info import CharacterInfo
-from .. import utils
+from skland_api import CharacterInfo
+from skland_api.cli.utils import formatter, display_timestamp
 
 
-def handle(character_info: CharacterInfo):
-    print(
-        utils.yellow_bold("上次在线时间"),
-        ": ",
-        utils.display_time(character_info.player_info["status"]["lastOnlineTs"]),
-        sep="",
-    )
+def main(character_info: CharacterInfo, config: dict | None):
+    with formatter.ready():
+        formatter.write_yellow_bold("上次在线时间", suffix=": ")
+        formatter.writeline(
+            display_timestamp(character_info.player_info["status"]["lastOnlineTs"])
+        )

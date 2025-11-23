@@ -13,28 +13,19 @@ class SklandAuthInfo:
 
     def __post_init__(self):
         if self.phone is not None:
-            if not isinstance(self.phone, str):
-                raise TypeError("phone should be 'str'")
-            if len(self.phone) != 11 or not all(char.isdigit() for char in self.phone):
+            if len(self.phone) != 11 or not self.phone.isdigit():
                 raise ValueError("invalid phone number (expected length: 11)")
-        if self.password is not None:
-            if not isinstance(self.password, str):
-                raise TypeError("password should be 'str'")
-        if self.token is not None:
-            if not isinstance(self.token, str):
-                raise TypeError("token should be 'str'")
-            if len(self.token) != 24:
-                raise ValueError("invalid token (expected length: 24)")
-        if self.cred is not None:
-            if not isinstance(self.cred, str):
-                raise TypeError("cred should be 'str'")
-            if len(self.cred) != 32:
-                raise ValueError("invalid cred (expected length: 32)")
-        if (self.phone or self.password) is not None and (
-            self.phone and self.password
-        ) is None:
-            raise ValueError("must present phone and password at same time")
-        if (self.phone or self.password or self.token or self.cred) is None:
+
+        if self.token is not None and len(self.token) != 24:
+            raise ValueError("invalid token (expected length: 24)")
+
+        if self.cred is not None and len(self.cred) != 32:
+            raise ValueError("invalid cred (expected length: 32)")
+
+        if bool(self.phone) ^ bool(self.password):
+            raise ValueError("phone and password must be provided together")
+
+        if not any((self.phone, self.password, self.token, self.cred)):
             raise ValueError("must present at least one piece of valid information")
 
     def as_dict(self) -> dict:
@@ -47,7 +38,7 @@ class SklandAuthInfo:
                 api.set_cred(self.cred)
                 return api
             except SklandApiException as e:
-                logging.warning("failed to get auth from cred: %s", e)
+                logging.warning(f"failed to get auth from cred: {e}")
         else:
             logging.warning("missing cred")
 
@@ -56,7 +47,7 @@ class SklandAuthInfo:
                 self.cred = api.cred_from_token(self.token)
                 return api
             except SklandApiException as e:
-                logging.warning("failed to get auth from token: %s", e)
+                logging.warning(f"failed to get auth from token: {e}")
         else:
             logging.warning("missing token")
         if self.phone is not None and self.password is not None:
@@ -65,7 +56,8 @@ class SklandAuthInfo:
                 self.cred = api.cred_from_token(self.token)
                 return api
             except SklandApiException as e:
-                logging.warning("failed to get auth from phone and password: %s", e)
+                logging.warning(f"failed to get auth from phone and password: {e}")
         else:
             logging.error("missing phone and password, failed to auth")
+
         raise ValueError("all provided information failed to auth")

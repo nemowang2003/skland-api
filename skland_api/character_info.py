@@ -1,8 +1,8 @@
-from ..api import SklandApi
+from .api import SklandApi
 from . import constants
 
 from functools import cached_property
-import json
+from pathlib import Path
 
 
 class CharacterInfo:
@@ -15,9 +15,6 @@ class CharacterInfo:
     @cached_property
     def player_info(self) -> dict:
         player_info = self.api.player_info(self.uid)
-        file = constants.CACHE_DIR / f"{self.name}-{self.uid}-player_info.json"
-        with file.open(mode="w", encoding="utf-8") as fp:
-            json.dump(player_info, fp, ensure_ascii=False, indent=2)
         return player_info
 
     @cached_property
@@ -30,9 +27,6 @@ class CharacterInfo:
     @cached_property
     def cultivate(self) -> dict:
         cultivate = self.api.cultivate(self.uid)
-        file = constants.CACHE_DIR / f"{self.name}-{self.uid}-cultivate.json"
-        with file.open(mode="w", encoding="utf-8") as fp:
-            json.dump(cultivate, fp, ensure_ascii=False, indent=2)
         return cultivate
 
     @cached_property
@@ -52,3 +46,13 @@ class CharacterInfo:
             for entry in self.cultivate["items"]
             if entry["id"] in constants.ITEM_MAPPING
         }
+
+    def dump(self, cache_path: Path) -> None:
+        import json
+
+        file = cache_path / f"{self.name}-{self.uid}-player_info.json"
+        with file.open(mode="w", encoding="utf-8") as fp:
+            json.dump(self.player_info, fp, ensure_ascii=False, indent=2)
+        file = cache_path / f"{self.name}-{self.uid}-cultivate.json"
+        with file.open(mode="w", encoding="utf-8") as fp:
+            json.dump(self.cultivate, fp, ensure_ascii=False, indent=2)

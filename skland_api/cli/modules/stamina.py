@@ -1,33 +1,24 @@
-from ..character_info import CharacterInfo
-from .. import utils
+from skland_api import CharacterInfo
+from skland_api.cli.utils import (
+    formatter,
+    display_timestamp,
+    display_capacity_or_progress,
+)
 
 
-def handle(character_info: CharacterInfo):
-    data = character_info.player_info
-    now = data["currentTs"]
-    data = data["status"]["ap"]
+def main(character_info: CharacterInfo, config: dict | None):
+    with formatter.ready():
+        data = character_info.player_info["status"]["ap"]
 
-    since_last_add = now - data["lastApAddTime"]
-    current = data["current"]
-    capacity = data["max"]
-    # 6 * 60 means 6 minutes for 1 stamina
-    current = min(capacity, current + since_last_add // (6 * 60))
+        now = character_info.player_info["currentTs"]
+        since_last_add = now - data["lastApAddTime"]
+        current = data["current"]
+        formatter.write_yellow_bold("预计当前理智", suffix=": ")
+        total = data["max"]
+        # 6 * 60 means 6 minutes for 1 stamina
+        current = min(total, current + since_last_add // (6 * 60))
+        formatter.writeline(display_capacity_or_progress(current, total, capacity=True))
 
-    if current < capacity:
-        color = utils.green_bold
-    else:
-        color = utils.red_bold
-    print(
-        utils.yellow_bold("预计当前理智"),
-        ": ",
-        color(f"{current}/{capacity}"),
-        sep="",
-    )
-
-    recovery_time = data["completeRecoveryTime"]
-    print(
-        utils.yellow_bold("理智回满时间"),
-        ": ",
-        utils.display_time(recovery_time),
-        sep="",
-    )
+        recovery_time = data["completeRecoveryTime"]
+        formatter.write_yellow_bold("理智回满时间", suffix=": ")
+        formatter.writeline(display_timestamp(recovery_time))

@@ -1,24 +1,21 @@
 [project]
 name = "skland-api"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "requests>=2.32.3",
+    "requests>=2.32.5",
 ]
 
 [project.scripts]
-skland = "skland_api.cli:main"
+skland = "skland_api.cli.main:main"
 
 [project.optional-dependencies]
 cli = [
+    "click>=8.3.1",
     "platformdirs>=4.3.8",
     "wcwidth>=0.2.13",
-]
-interactive = [
-    "platformdirs>=4.3.8",
-    "prompt-toolkit>=3.0.51",
 ]
 
 [build-system]
@@ -27,4 +24,3 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
-

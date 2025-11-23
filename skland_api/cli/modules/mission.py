@@ -1,28 +1,18 @@
-from ..character_info import CharacterInfo
-from .. import utils
+from skland_api import CharacterInfo
+from skland_api.cli.utils import formatter, display_capacity_or_progress
 
 
-def handle(character_info: CharacterInfo):
-    mission = character_info.player_info["routine"]
+def main(character_info: CharacterInfo, config: dict | None):
+    with formatter.ready():
+        mission = character_info.player_info["routine"]
+        daily = mission["daily"]
+        formatter.write_yellow_bold("日常任务进度", suffix=": ")
+        current = daily["current"]
+        total = daily["total"]
+        formatter.writeline(display_capacity_or_progress(current, total, progress=True))
 
-    daily = mission["daily"]
-    msg = utils.yellow_bold("日常任务进度") + ": "
-    current = daily["current"]
-    total = daily["total"]
-    if current < total:
-        color = utils.red_bold
-    else:
-        color = utils.green_bold
-    msg += color(f"{current}/{total}")
-    print(msg)
-
-    weekly = mission["weekly"]
-    msg = utils.yellow_bold("周常任务进度") + ": "
-    current = weekly["current"]
-    total = weekly["total"]
-    if current < total:
-        color = utils.red_bold
-    else:
-        color = utils.green_bold
-    msg += color(f"{current}/{total}")
-    print(msg)
+        weekly = mission["weekly"]
+        formatter.write_yellow_bold("周常任务进度", suffix=": ")
+        current = weekly["current"]
+        total = weekly["total"]
+        formatter.writeline(display_capacity_or_progress(current, total, progress=True))

@@ -1,39 +1,43 @@
-from ..character_info import CharacterInfo
-from .. import utils
+from skland_api import CharacterInfo
+from skland_api.cli.utils import (
+    formatter,
+    display_timestamp,
+    display_capacity_or_progress,
+)
+
+IS_RECRUITING = 2
+MAX_REFRESH_COUNT = 3
 
 
-def handle(character_info: CharacterInfo):
-    data = character_info.player_info
-    now = data["currentTs"]
-    progress_data = data["recruit"]
-    for index, progress in enumerate(progress_data, start=1):
-        state = progress["state"]
-        if state == 2:  # 2 for recruiting
-            end_time = progress["finishTs"]
-            if end_time < now:
-                msg = utils.green_bold("招募完毕")
-            else:
-                msg = utils.display_time(end_time) + "招募完毕"
-        else:
-            msg = utils.green_bold("空闲")
-        print(
-            utils.yellow_bold(f"公开招募栏位{index}"),
-            ": ",
-            msg,
-            sep="",
-        )
+def main(character_info: CharacterInfo, config: dict | None):
+    with formatter.ready():
+        data = character_info.player_info
+        now = data["currentTs"]
+        progress_data = data["recruit"]
 
-    refresh_data = data["building"]["hire"]
-    refresh_count = refresh_data["refreshCount"]
+        formatter.write_yellow_bold("公招概览", suffix="\n")
+        with formatter.indent():
+            for index, progress in enumerate(progress_data, start=1):
+                formatter.write_yellow_bold(f"栏位{index}", suffix=": ")
+                state = progress["state"]
+                if state == IS_RECRUITING:  # 2 for recruiting
+                    end_time = progress["finishTs"]
+                    if end_time < now:
+                        formatter.write_green_bold("招募完毕", suffix="\n")
+                    else:
+                        formatter.writeline(f"{display_timestamp(end_time)}招募完毕")
+                else:
+                    formatter.write_green_bold("空闲", suffix="\n")
 
-    refresh_time = refresh_data["completeWorkTime"]
-    if refresh_time < now:
-        refresh_count += 1
-    color = utils.green_bold if refresh_count < 3 else utils.red_bold
-    msg = color(f"{refresh_count}/3") + f" ({utils.display_time(refresh_time)}刷新)"
-    print(
-        utils.yellow_bold("公开招募刷新次数"),
-        ": ",
-        msg,
-        sep="",
-    )
+            formatter.write_yellow_bold("刷新次数", suffix=": ")
+            refresh_data = data["building"]["hire"]
+            refresh_count = refresh_data["refreshCount"]
+            refresh_time = refresh_data["completeWorkTime"]
+            if refresh_time < now:
+                refresh_count += 1
+            formatter.write(
+                display_capacity_or_progress(
+                    refresh_count, MAX_REFRESH_COUNT, capacity=True
+                ),
+                f" ({display_timestamp(refresh_time)}刷新)",
+            )

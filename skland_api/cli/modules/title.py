@@ -1,18 +1,19 @@
-from ..character_info import CharacterInfo
-from .. import utils
+from skland_api import CharacterInfo
+from skland_api.cli.utils import formatter, display_timestamp
 
 import wcwidth
 
 
-def handle(character_info: CharacterInfo):
-    data = character_info.player_info
-    data = data["status"]
-    name = data["name"]
-    left, right = name.rsplit("#", maxsplit=1)
-    print(utils.green_bold(left), utils.green_bold(right), sep="#")
+def main(character_info: CharacterInfo, config: dict | None):
+    with formatter.ready():
+        data = character_info.player_info["status"]
 
-    update_time = data["storeTs"]
-    msg = "".join(["更新于", utils.display_time(update_time)])
-    print(msg)
+        name = data["name"]
+        left, right = name.rsplit("#", maxsplit=1)
+        formatter.write_green_bold(left, suffix="#")
+        formatter.write_green_bold(right, suffix="\n")
 
-    print("-" * wcwidth.wcswidth(msg))
+        update_time = data["storeTs"]
+        msg = f"更新于{display_timestamp(update_time)}"
+        formatter.writeline(msg)
+        formatter.writeline("-" * wcwidth.wcswidth(msg))
