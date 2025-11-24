@@ -98,20 +98,20 @@ def main(character_info: CharacterInfo, config: dict | None):
             remain_seconds = drone["remainSecs"]
             # 无人机的remainSecs数据按照更新时间计算（与专精的remainSecs不同）
 
-            now = int(time.time())
-            approximate_recover_speed = (total - current) / remain_seconds
-            remain_seconds = max(remain_seconds + update_time - now, 0)
-            current = min(
-                current + int((now - update_time) * approximate_recover_speed),
-                total,
-            )
+            if remain_seconds > 0:
+                now = int(time.time())
+                approximate_recover_speed = (total - current) / remain_seconds
+                remain_seconds = max(remain_seconds + update_time - now, 0)
+                current = min(
+                    current + int((now - update_time) * approximate_recover_speed),
+                    total,
+                )
 
             formatter.write(display_capacity_or_progress(current, total, capacity=True))
 
             if remain_seconds > 0:
-                formatter.writeline(
-                    f" (预计{display_remain_seconds(remain_seconds)}补满)"
-                )
+                formatter.write(f" (预计{display_remain_seconds(remain_seconds)}补满)")
+            formatter.write("\n")
 
             formatter.write_yellow_bold("疲劳干员", suffix=":")
             if data["tiredChars"]:
