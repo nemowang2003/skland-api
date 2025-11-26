@@ -3,6 +3,7 @@ from skland_api.cli.utils import (
     Formatter,
     display_capacity_or_progress,
     display_remain_seconds,
+    display_timestamp,
 )
 
 from itertools import permutations
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 TOTAL_TRAIN_POINT = 30000
 STAMINA_DIVIDOR = 360000
 STAMINA_REDLINE = 8
+FULL_STAMINA = 24
+FIAMMETTA_RECOVER_PER_HOUR = 2
 
 """
 (skland_entry, maa_plan_entry, display_string)
@@ -173,9 +176,7 @@ def main(character_info: CharacterInfo, config: dict | None):
             import json
 
             formatter.write_yellow_bold("排班表检查")
-            update_time = datetime.fromtimestamp(
-                character_info.player_info["status"]["storeTs"]
-            ).strftime("%H:%M")
+            update_time_str = datetime.fromtimestamp(update_time).strftime("%H:%M")
 
             with formatter.indent():
                 with file.open(mode="r", encoding="utf-8") as fp:
@@ -187,7 +188,7 @@ def main(character_info: CharacterInfo, config: dict | None):
                             fiammetta_targets.add(fiammetta["target"])
 
                     if not any(
-                        start < update_time < end for start, end in plan["period"]
+                        start < update_time_str < end for start, end in plan["period"]
                     ):
                         continue
                     for (
@@ -241,14 +242,22 @@ def main(character_info: CharacterInfo, config: dict | None):
                                 if name not in fiammetta_targets:
                                     continue
                                 fiammetta_targets.remove(name)
-                                stamina = operator["ap"] // STAMINA_DIVIDOR
+                                stamina = operator["ap"] / STAMINA_DIVIDOR
                                 formatter.write_yellow_bold(name, suffix=": ")
                                 if stamina <= STAMINA_REDLINE:
-                                    formatter.write_red_bold(str(stamina), suffix="\n")
+                                    formatter.write_red_bold(f"{stamina:.2f}")
                                 else:
-                                    formatter.write_green_bold(
-                                        str(stamina), suffix="\n"
+                                    formatter.write_green_bold(f"{stamina:.2f}")
+                                if name == "菲亚梅塔":
+                                    recovery_seconds = int(
+                                        (FULL_STAMINA - stamina)
+                                        / FIAMMETTA_RECOVER_PER_HOUR
+                                        * 3600
                                     )
+                                    formatter.write(
+                                        f" (预计{display_timestamp(update_time + recovery_seconds)}回满)"
+                                    )
+                                formatter.write("\n")
                     if fiammetta_targets:
                         formatter.write_yellow_bold(
                             "没有找到的菲亚梅塔相关干员", suffix=":"
