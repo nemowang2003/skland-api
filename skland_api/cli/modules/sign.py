@@ -1,11 +1,11 @@
 from skland_api import CharacterInfo
-from skland_api.cli.utils import formatter
+from skland_api.cli.utils import Formatter
 
 from datetime import datetime
 
 
 def main(character_info: CharacterInfo, config: dict | None):
-    with formatter.ready():
+    with Formatter() as formatter:
         daily_sign_info = character_info.api.daily_sign_info(character_info.uid)
 
         formatter.write_yellow_bold("每日签到", suffix=": ")

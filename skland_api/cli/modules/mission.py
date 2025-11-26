@@ -1,9 +1,9 @@
 from skland_api import CharacterInfo
-from skland_api.cli.utils import formatter, display_capacity_or_progress
+from skland_api.cli.utils import Formatter, display_capacity_or_progress
 
 
 def main(character_info: CharacterInfo, config: dict | None):
-    with formatter.ready():
+    with Formatter() as formatter:
         mission = character_info.player_info["routine"]
         daily = mission["daily"]
         formatter.write_yellow_bold("日常任务进度", suffix=": ")

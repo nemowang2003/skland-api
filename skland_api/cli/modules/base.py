@@ -1,6 +1,6 @@
 from skland_api import CharacterInfo
 from skland_api.cli.utils import (
-    formatter,
+    Formatter,
     display_capacity_or_progress,
     display_remain_seconds,
 )
@@ -85,7 +85,7 @@ def align_group(
 
 
 def main(character_info: CharacterInfo, config: dict | None):
-    with formatter.ready():
+    with Formatter() as formatter:
         data = character_info.player_info["building"]
         update_time = character_info.player_info["status"]["storeTs"]
 

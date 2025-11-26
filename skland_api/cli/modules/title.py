@@ -1,11 +1,11 @@
 from skland_api import CharacterInfo
-from skland_api.cli.utils import formatter, display_timestamp
+from skland_api.cli.utils import Formatter, display_timestamp
 
 import wcwidth
 
 
 def main(character_info: CharacterInfo, config: dict | None):
-    with formatter.ready():
+    with Formatter() as formatter:
         data = character_info.player_info["status"]
 
         name = data["name"]

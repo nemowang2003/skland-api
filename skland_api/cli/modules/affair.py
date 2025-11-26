@@ -2,12 +2,12 @@ from skland_api import CharacterInfo
 from skland_api.cli.utils import (
     display_timestamp,
     display_capacity_or_progress,
-    formatter,
+    Formatter,
 )
 
 
 def main(character_info: CharacterInfo, config: dict | None):
-    with formatter.ready():
+    with Formatter() as formatter:
         data = character_info.player_info["campaign"]["reward"]
         current = data["current"]
         total = data["total"]

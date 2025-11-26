@@ -6,12 +6,10 @@ from .formatter import (
 )
 from .logger import LogFormatter
 
-formatter = Formatter()
-
 __all__ = [
     "LogFormatter",
     "display_capacity_or_progress",
     "display_remain_seconds",
     "display_timestamp",
-    "formatter",
+    "Formatter",
 ]

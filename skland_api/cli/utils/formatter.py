@@ -1,6 +1,8 @@
 from contextlib import contextmanager
+from typing import TextIO
 
 import click
+import sys
 import time
 
 
@@ -47,11 +49,22 @@ def display_capacity_or_progress(
 
 
 class Formatter:
-    def __init__(self) -> None:
+    def __init__(self, fp: TextIO | None = None) -> None:
         self.indent_width: int = 0
         self.buffer: list[str] = []
         self.ready_depth: int = 0
         self.at_line_start: bool = True
+
+        self.fp = fp or sys.stdout
+
+    def real_write(self, msg: str):
+        try:
+            isatty = self.fp.isatty()
+        except Exception:
+            isatty = False
+        if not isatty:
+            msg = click.unstyle(msg)
+        print(msg, end="", file=self.fp)
 
     def write(self, *msgs: str) -> None:
         for msg in msgs:
@@ -60,7 +73,7 @@ class Formatter:
             if self.ready_depth:
                 self.buffer.append(msg)
             else:
-                click.echo(msg, nl=False)
+                self.real_write(msg)
             self.at_line_start = msg.endswith("\n")
 
     def writeline(self, msg: str) -> None:
@@ -71,22 +84,21 @@ class Formatter:
                 msg += "\n"
             self.buffer.append(msg)
         else:
-            click.echo(msg)
+            self.real_write(msg)
         self.at_line_start = True
 
     def flush(self):
-        click.echo("".join(self.buffer), nl=False)
+        self.real_write("".join(self.buffer))
         self.buffer.clear()
 
-    @contextmanager
-    def ready(self):
+    def __enter__(self):
         self.ready_depth += 1
-        try:
-            yield
-        finally:
-            self.ready_depth -= 1
-            if self.ready_depth == 0:
-                self.flush()
+        return self
+
+    def __exit__(self, *args):
+        self.ready_depth -= 1
+        if self.ready_depth == 0:
+            self.flush()
 
     @contextmanager
     def indent(self, n: int = 2):

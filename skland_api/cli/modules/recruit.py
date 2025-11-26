@@ -1,6 +1,6 @@
 from skland_api import CharacterInfo
 from skland_api.cli.utils import (
-    formatter,
+    Formatter,
     display_timestamp,
     display_capacity_or_progress,
 )
@@ -10,7 +10,7 @@ MAX_REFRESH_COUNT = 3
 
 
 def main(character_info: CharacterInfo, config: dict | None):
-    with formatter.ready():
+    with Formatter() as formatter:
         data = character_info.player_info
         now = data["currentTs"]
         progress_data = data["recruit"]
