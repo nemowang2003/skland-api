@@ -1,9 +1,9 @@
+import sys
+import time
 from contextlib import contextmanager
 from typing import TextIO
 
 import click
-import sys
-import time
 
 
 def display_remain_seconds(duration: int, with_suffix: bool = True) -> str:

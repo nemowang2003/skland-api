@@ -1,8 +1,8 @@
 from skland_api import CharacterInfo
 from skland_api.cli.utils import (
     Formatter,
-    display_timestamp,
     display_capacity_or_progress,
+    display_timestamp,
 )
 
 IS_RECRUITING = 2
@@ -36,8 +36,6 @@ def main(character_info: CharacterInfo, config: dict | None):
             if refresh_time < now:
                 refresh_count += 1
             formatter.write(
-                display_capacity_or_progress(
-                    refresh_count, MAX_REFRESH_COUNT, capacity=True
-                ),
+                display_capacity_or_progress(refresh_count, MAX_REFRESH_COUNT, capacity=True),
                 f" ({display_timestamp(refresh_time)}刷新)",
             )

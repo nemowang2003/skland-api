@@ -1,8 +1,8 @@
 from skland_api import CharacterInfo
 from skland_api.cli.utils import (
     Formatter,
-    display_timestamp,
     display_capacity_or_progress,
+    display_timestamp,
 )
 
 

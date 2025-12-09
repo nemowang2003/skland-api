@@ -1,11 +1,12 @@
-from skland_api import SklandAuthInfo, CharacterInfo
-from .utils.logger import LogFormatter
-
+import importlib
+import json
 from pathlib import Path
 
 import click
-import importlib
-import json
+
+from skland_api import CharacterInfo, SklandAuthInfo
+
+from .utils.logger import LogFormatter
 
 APPNAME = "skland-api"
 
@@ -169,9 +170,7 @@ def prepare_modules(
 
 
 @click.command()
-@click.option(
-    "--names", metavar="name1,name2,...", callback=prepare_names, expose_value=False
-)
+@click.option("--names", metavar="name1,name2,...", callback=prepare_names, expose_value=False)
 @click.option(
     "--modules",
     metavar="module1,module2,...",

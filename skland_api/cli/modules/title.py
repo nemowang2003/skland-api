@@ -1,7 +1,7 @@
+import wcwidth
+
 from skland_api import CharacterInfo
 from skland_api.cli.utils import Formatter, display_timestamp
-
-import wcwidth
 
 
 def main(character_info: CharacterInfo, config: dict | None):

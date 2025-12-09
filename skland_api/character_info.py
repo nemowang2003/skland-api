@@ -1,8 +1,8 @@
-from .api import SklandApi
-from . import constants
-
 from functools import cached_property
 from pathlib import Path
+
+from . import constants
+from .api import SklandApi
 
 
 class CharacterInfo:
@@ -20,8 +20,7 @@ class CharacterInfo:
     @cached_property
     def operator_mapping(self) -> dict:
         return {
-            entry["id"]: entry["name"]
-            for entry in self.player_info["charInfoMap"].values()
+            entry["id"]: entry["name"] for entry in self.player_info["charInfoMap"].values()
         } | constants.OPERATOR_MAPPING_FIX
 
     @cached_property

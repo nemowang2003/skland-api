@@ -1,3 +1,10 @@
+import logging
+import time
+from itertools import permutations
+from typing import Generator
+
+import click
+
 from skland_api import CharacterInfo
 from skland_api.cli.utils import (
     Formatter,
@@ -5,13 +12,6 @@ from skland_api.cli.utils import (
     display_remain_seconds,
     display_timestamp,
 )
-
-from itertools import permutations
-from typing import Generator
-
-import click
-import logging
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,7 @@ FACILITY_KEYS = (
 )
 
 
-def iter_operator_from_skland_facility(
-    data: dict, entry: str
-) -> Generator[dict, None, None]:
+def iter_operator_from_skland_facility(data: dict, entry: str) -> Generator[dict, None, None]:
     result = data[entry]
     if isinstance(result, list):
         yield from data[entry]
@@ -126,6 +124,41 @@ def main(character_info: CharacterInfo, config: dict | None):
                 formatter.write_green_bold("无", prefix=" ")
             formatter.write("\n")
 
+            formatter.write_yellow_bold("专精状态")
+            training = data["training"]
+            trainee = training["trainee"]
+            if trainee is None or trainee["targetSkill"] == -1:
+                formatter.writeline(": 无")
+            else:
+                with formatter.indent():
+                    name = character_info.operator_mapping[trainee["charId"]]
+                    skill_id = trainee["targetSkill"]
+                    formatter.write_yellow_bold("专精干员", suffix=": ")
+                    formatter.writeline(f"{name}({skill_id + 1}技能)")
+
+                    formatter.write_yellow_bold("协助干员", suffix=": ")
+                    trainer = training["trainer"]
+                    if trainer is None:
+                        formatter.write_red_bold("无", suffix="\n")
+                    else:
+                        name = character_info.operator_mapping[trainer["charId"]]
+                        formatter.writeline(name)
+
+                    percentage = int(
+                        (TOTAL_TRAIN_POINT - training["remainPoint"] + 1) * 100 / TOTAL_TRAIN_POINT
+                    )
+                    remain_seconds = training["remainSecs"]
+                    formatter.write_yellow_bold("专精进度", suffix=": ")
+                    formatter.writeline(
+                        f"{percentage}% ({display_remain_seconds(remain_seconds)}完成)"
+                    )
+                    formatter.write_style(
+                        "TODO: 适配不同专精等级，根据当前时间计算进度",
+                        suffix="\n",
+                        fg="cyan",
+                        bold=True,
+                    )
+
             if config is None or (path := config.get(character_info.name)) is None:
                 return
             from pathlib import Path
@@ -135,8 +168,8 @@ def main(character_info: CharacterInfo, config: dict | None):
                 logging.warning(f"invalid path {path!r} for {character_info.name!r}")
                 return
 
-            from datetime import datetime
             import json
+            from datetime import datetime
 
             formatter.write_yellow_bold("排班表检查")
             update_time_str = datetime.fromtimestamp(update_time).strftime("%H:%M")
@@ -150,26 +183,20 @@ def main(character_info: CharacterInfo, config: dict | None):
                         if fiammetta["enable"]:
                             fiammetta_targets.add(fiammetta["target"])
 
-                    if not any(
-                        start < update_time_str < end for start, end in plan["period"]
-                    ):
+                    if not any(start < update_time_str < end for start, end in plan["period"]):
                         continue
                     for (
                         skland_entry,
                         plan_entry,
                         facility_display_name,
                     ) in FACILITY_KEYS:
-                        expected = [
-                            set(room["operators"]) for room in plan["rooms"][plan_entry]
-                        ]
+                        expected = [set(room["operators"]) for room in plan["rooms"][plan_entry]]
                         actual = [
                             set(
                                 character_info.operator_mapping[operator["charId"]]
                                 for operator in room["chars"]
                             )
-                            for room in iter_operator_from_skland_facility(
-                                data, skland_entry
-                            )
+                            for room in iter_operator_from_skland_facility(data, skland_entry)
                         ]
 
                         for e, a in zip(*align_group(expected, actual)):
@@ -199,9 +226,7 @@ def main(character_info: CharacterInfo, config: dict | None):
                     for entry, _, __ in FACILITY_KEYS:
                         for room in iter_operator_from_skland_facility(data, entry):
                             for operator in room["chars"]:
-                                name = character_info.operator_mapping[
-                                    operator["charId"]
-                                ]
+                                name = character_info.operator_mapping[operator["charId"]]
                                 if name not in fiammetta_targets:
                                     continue
                                 fiammetta_targets.remove(name)
@@ -213,18 +238,14 @@ def main(character_info: CharacterInfo, config: dict | None):
                                     formatter.write_green_bold(f"{stamina:.2f}")
                                 if name == "菲亚梅塔":
                                     recovery_seconds = int(
-                                        (FULL_STAMINA - stamina)
-                                        / FIAMMETTA_RECOVER_PER_HOUR
-                                        * 3600
+                                        (FULL_STAMINA - stamina) / FIAMMETTA_RECOVER_PER_HOUR * 3600
                                     )
                                     formatter.write(
                                         f" (预计{display_timestamp(update_time + recovery_seconds)}回满)"
                                     )
                                 formatter.write("\n")
                     if fiammetta_targets:
-                        formatter.write_yellow_bold(
-                            "没有找到的菲亚梅塔相关干员", suffix=":"
-                        )
+                        formatter.write_yellow_bold("没有找到的菲亚梅塔相关干员", suffix=":")
                         for name in fiammetta_targets:
                             formatter.write_red_bold(name, prefix=" ")
                         formatter.write("\n")

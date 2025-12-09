@@ -1,6 +1,6 @@
-import pkgutil
 import importlib
 import logging
+import pkgutil
 
 default_modules = [
     "title",

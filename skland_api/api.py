@@ -1,9 +1,10 @@
 import hashlib
 import hmac
 import json
-import requests
 import time
 import urllib.parse
+
+import requests
 
 APP_CODE = "4ca99fa6b56cc2ba"  # magic code
 
@@ -20,6 +21,7 @@ class SklandApiException(Exception):
 class SklandClient:
     def __init__(self):
         self.token = None
+        self.session = requests.Session()
         self.headers = {
             "User-Agent": "Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0",
             "Accept-Encoding": "gzip",
@@ -71,7 +73,7 @@ class SklandClient:
             path = parse_result.path
             payload = parse_result.query
             self.headers |= self.sign(path, self.token, payload)
-        response = requests.get(url, headers=self.headers, **kwargs)
+        response = self.session.get(url, headers=self.headers, **kwargs)
         try:
             response = response.json()
         except json.JSONDecodeError:
@@ -89,7 +91,7 @@ class SklandClient:
             path = urllib.parse.urlparse(url).path
             payload = kwargs.get("data") or json.dumps(kwargs.get("json", dict()))
             self.headers |= self.sign(path, self.token, payload)
-        response = requests.post(url, headers=self.headers, **kwargs)
+        response = self.session.post(url, headers=self.headers, **kwargs)
         try:
             response = response.json()
         except json.JSONDecodeError:
@@ -142,34 +144,26 @@ class SklandApi:
 
     def set_cred(self, cred: str):
         self.client.cred = cred
-        self.client.token = self.client.get(
-            "https://zonai.skland.com/api/v1/auth/refresh"
-        )["data"]["token"]
-
-    def binding_list(self) -> list[dict]:
-        response = self.client.get(
-            "https://zonai.skland.com/api/v1/game/player/binding"
-        )
-        return [
-            character
-            for game in response["data"]["list"]
-            for character in game["bindingList"]
+        self.client.token = self.client.get("https://zonai.skland.com/api/v1/auth/refresh")["data"][
+            "token"
         ]
 
+    def binding_list(self) -> list[dict]:
+        response = self.client.get("https://zonai.skland.com/api/v1/game/player/binding")
+        return [character for game in response["data"]["list"] for character in game["bindingList"]]
+
     def cultivate(self, uid: str) -> dict:
-        return self.client.get(
-            f"https://zonai.skland.com/api/v1/game/cultivate/player?uid={uid}"
-        )["data"]
+        return self.client.get(f"https://zonai.skland.com/api/v1/game/cultivate/player?uid={uid}")[
+            "data"
+        ]
 
     def player_info(self, uid: str) -> dict:
-        return self.client.get(
-            f"https://zonai.skland.com/api/v1/game/player/info?uid={uid}"
-        )["data"]
+        return self.client.get(f"https://zonai.skland.com/api/v1/game/player/info?uid={uid}")[
+            "data"
+        ]
 
     def daily_sign_info(self, uid: str) -> dict:
-        return self.client.get(
-            f"https://zonai.skland.com/api/v1/game/attendance?uid={uid}"
-        )["data"]
+        return self.client.get(f"https://zonai.skland.com/api/v1/game/attendance?uid={uid}")["data"]
 
     def do_daily_sign(self, uid: str) -> list[dict]:
         return self.client.post(

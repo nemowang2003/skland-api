@@ -1,7 +1,7 @@
-from .api import SklandApi, SklandApiException
-
-from dataclasses import asdict, dataclass
 import logging
+from dataclasses import asdict, dataclass
+
+from .api import SklandApi, SklandApiException
 
 
 @dataclass(kw_only=True)
