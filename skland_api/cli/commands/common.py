@@ -1,57 +1,38 @@
 import asyncio
+import inspect
 import json
 from dataclasses import dataclass
-from functools import cached_property, wraps
+from functools import wraps
 from pathlib import Path
 from typing import Self
 
-import typer
+import rich_click as click
 from loguru import logger
+from rich.panel import Panel
+from rich.prompt import Prompt
 
 from skland_api import SklandAuthInfo
+from skland_api.cli.utils import console
 
 APPNAME = "skland-api"
 
 
-@dataclass(kw_only=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class GlobalOptions:
-    config_dir: Path
+    names: list[str]
+    modules: list[str]
     cache_dir: Path
+    auth_file: Path
+    log_file: Path
+    auth: dict
+    config: dict
 
-    @cached_property
-    def auth(self) -> dict[str, dict]:
-        with self.auth_file.open(encoding="utf-8") as fp:
-            return json.load(fp)
-
-    @cached_property
-    def config(self) -> dict:
-        with self.config_file.open(encoding="utf-8") as fp:
-            return json.load(fp)
-
-    @cached_property
-    def names(self) -> list[str]:
-        return list(self.auth.keys())
-
-    @cached_property
-    def modules(self) -> list[str]:
-        from skland_api.cli.modules import default_modules
-
-        return default_modules
-
-    @cached_property
-    def auth_file(self) -> Path:
-        return self.config_dir / "auth.json"
-
-    @cached_property
-    def config_file(self) -> Path:
-        return self.config_dir / "config.json"
-
-    @cached_property
-    def log_file(self) -> Path:
-        return self.cache_dir / f"{APPNAME}.log"
+    def update_auth_file(self) -> None:
+        with self.auth_file.open("w", encoding="utf-8") as fp:
+            json.dump(self.auth, fp, ensure_ascii=True, indent=2)
 
     @classmethod
-    def construct_with_fallback(
+    def from_command_line_options(
         cls,
         names: list[str] | None,
         modules: list[str] | None,
@@ -61,68 +42,103 @@ class GlobalOptions:
         cache_dir: Path,
         log_file: Path | None,
     ) -> Self:
-        instance = cls(
-            config_dir=config_dir.expanduser(),
-            cache_dir=cache_dir.expanduser(),
-        )
+        config_dir = config_dir.expanduser()
+
         if auth_file is not None:
-            instance.auth_file = auth_file.expanduser()
-        if not instance.auth_file.exists():
-            create_auth_file(instance.auth_file)
+            auth_file = auth_file.expanduser()
+        else:
+            auth_file = config_dir / "auth.json"
+        if not auth_file.exists():
+            create_auth_file(auth_file)
+        with auth_file.open(encoding="utf-8") as fp:
+            auth = json.load(fp)
+
         if config_file is not None:
-            instance.config_file = config_file.expanduser()
-        if not instance.config_file.exists():
-            create_config_file(instance.config_file)
+            config_file = config_file.expanduser()
+        else:
+            config_file = config_dir / "config.json"
+        if not config_file.exists():
+            create_config_file(config_file)
+        with config_file.open(encoding="utf-8") as fp:
+            config = json.load(fp)
+
+        cache_dir = cache_dir.expanduser()
+
         if log_file is not None:
-            instance.log_file = log_file.expanduser()
-        if names is not None:
-            instance.names = names
-        elif (config_names := instance.config.get("names")) is not None:
-            instance.names = config_names
-        unique_names = list(dict.fromkeys(instance.names))
-        if instance.names != unique_names:
+            log_file = log_file.expanduser()
+        else:
+            log_file = cache_dir / f"{APPNAME}.log"
+
+        if names is None:
+            if (config_names := config.get("names")) is not None:
+                names = config_names
+            else:
+                names = list(auth.keys())
+        unique_names = list(dict.fromkeys(names))
+        if names != unique_names:
             logger.warning("Duplicate names found, duplicates will be ignored.")
-            instance.names = unique_names
-        if modules is not None:
-            instance.modules = modules
-        elif (config_modules := instance.config.get("modules")) is not None:
-            instance.modules = config_modules
-        unique_modules = list(dict.fromkeys(instance.modules))
-        if instance.modules != unique_modules:
+            names = unique_names
+
+        if modules is None:
+            if (config_modules := config.get("modules")) is not None:
+                modules = config_modules
+            else:
+                from skland_api.cli.modules import default_modules
+
+                modules = default_modules
+        unique_modules = list(dict.fromkeys(modules))
+        if modules != unique_modules:
             logger.warning("Duplicate modules found, duplicates will be ignored.")
-            instance.modules = unique_modules
-        return instance
+            modules = unique_modules
+
+        return cls(
+            names=names,
+            modules=modules,
+            cache_dir=cache_dir,
+            auth_file=auth_file,
+            log_file=log_file,
+            auth=auth,
+            config=config,
+        )
 
 
 def create_auth_file(file: Path) -> None:
+    if file.exists():
+        logger.error(f"File {file} already exists when calling create_auth_file.")
+        raise FileExistsError(file)
+
     while True:
         try:
-            typer.echo(
-                "Add auth info for your first account!"
-                "WARNING: All fields will be stored in PLAIN TEXT in:"
-                f"  {file.absolute()}"
-                "Anyone with access to this file can read them."
-                ""
-                "You must provide at least ONE of:"
-                "  - phone (11 digits) AND password"
-                "  - token (len=24)"
-                "  - cred  (len=32)",
-                err=True,
+            console.print(
+                Panel(
+                    f"[bold]All fields will be stored in [red]PLAIN TEXT[/red] in:[/bold]\n"
+                    f"  [underline]{file.absolute()}[/underline]\n"
+                    "Anyone with access to this file can read them.\n\n"
+                    "You must provide at least [bold cyan]ONE[/] of:\n"
+                    " • Phone (11 digits) AND Password\n"
+                    " • Token (len=24)\n"
+                    " • Cred  (len=32)",
+                    title="[bold red]⚠️  Security Warning & Setup[/]",
+                    border_style="red",
+                    expand=False,
+                )
             )
 
-            phone = typer.prompt("Phone Number [Recommended]", default="")
-            password = typer.prompt("Password [Recommended]", default="")
-            token = typer.prompt("Token", default="")
-            cred = typer.prompt("Cred", default="")
+            phone = Prompt.ask("Phone Number [dim](Recommended)[/]", default=None)
+
+            password = Prompt.ask("Password     [dim](Recommended)[/]", password=True, default=None)
+
+            token = Prompt.ask("Token", default=None)
+            cred = Prompt.ask("Cred", default=None)
 
             auth_info = SklandAuthInfo(
-                phone=phone or None,
-                password=password or None,
-                token=token or None,
-                cred=cred or None,
+                phone=phone,
+                password=password,
+                token=token,
+                cred=cred,
             )
 
-            name = typer.prompt("Name for this account")
+            name = Prompt.ask("Name for this account")
 
             with file.open("w", encoding="utf-8") as fp:
                 json.dump(
@@ -132,30 +148,39 @@ def create_auth_file(file: Path) -> None:
                     indent=2,
                 )
 
-            typer.echo(f"Auth file created at: {file}", err=True)
+            console.print(f"[bold green]Auth file created successfully at:[/]\n  {file}")
+            return
 
         except ValueError as e:
-            typer.echo(f"Invalid information: {e}", err=True)
+            console.print(f"[bold red]Invalid information:[/]\n  {e}")
+            console.print("[yellow]Please try again...[/]\n")
+
         except (EOFError, KeyboardInterrupt):
-            typer.echo("", err=True)
-            raise typer.Abort()
+            console.print("\n[bold yellow]! Aborted by user.[/]")
+            raise click.Abort()
 
 
 def create_config_file(file: Path):
-    from skland_api.cli.modules import default_modules
+    if file.exists():
+        logger.error(f"File {file} already exists when calling create_config_file.")
+        raise FileExistsError(file)
+    try:
+        with file.open("w", encoding="utf-8") as fp:
+            json.dump(
+                {"names": None, "modules": None, "module-config": {}},
+                fp,
+                ensure_ascii=True,
+                indent=2,
+            )
+        console.print(f"[bold green]Config file created at:[/]\n  {file}")
 
-    with file.open("w", encoding="utf-8") as fp:
-        json.dump(
-            {"name": [], "modules": default_modules, "module-config": {}},
-            fp,
-            ensure_ascii=True,
-            indent=2,
-        )
-    typer.echo(f"Config file created at: {file}", err=True)
+    except Exception as e:
+        console.print(f"[bold red]Failed to create config file:[/]\n  {e}")
+        raise click.Abort()
 
 
 def async_command(func):
-    if not asyncio.iscoroutinefunction(func):
+    if not inspect.iscoroutinefunction(func):
         raise ValueError(f"{func!r} is not async")
 
     @wraps(func)

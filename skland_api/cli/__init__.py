@@ -1,5 +1,5 @@
-from .commands import app
+from .commands import main
 
 __all__ = [
-    "app",
+    "main",
 ]

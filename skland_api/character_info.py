@@ -1,4 +1,5 @@
 import asyncio
+import json
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -7,7 +8,8 @@ from . import constants
 from .api import SklandApi
 
 
-@dataclass(frozen=True, kw_only=True)
+# Cannot use frozen=True and slots=True because of cached_property
+@dataclass(kw_only=True)
 class CharacterInfo:
     name: str
     api: SklandApi
@@ -39,9 +41,7 @@ class CharacterInfo:
             if entry["id"] in constants.ITEM_MAPPING
         }
 
-    def dump(self, cache_path: Path) -> None:
-        import json
-
+    def dump_to(self, cache_path: Path) -> None:
         file = cache_path / f"{self.name}-{self.uid}-player_info.json"
         with file.open(mode="w", encoding="utf-8") as fp:
             json.dump(self.player_info, fp, ensure_ascii=False, indent=2)
@@ -56,16 +56,30 @@ class CharacterInfoLoader:
         self.api = api
         self.uid = character["uid"]
 
-    async def load_cultivate(self) -> dict:
-        return await self.api.cultivate(self.uid)
+    async def partial_load_cultivate(self) -> CharacterInfo:
+        cultivate = await self.api.cultivate(self.uid)
+        return CharacterInfo(
+            name=self.name,
+            api=self.api,
+            uid=self.uid,
+            cultivate=cultivate,
+            player_info={},
+        )
 
-    async def load_player_info(self) -> dict:
-        return await self.api.player_info(self.uid)
+    async def partial_load_player_info(self) -> CharacterInfo:
+        cultivate = await self.api.player_info(self.uid)
+        return CharacterInfo(
+            name=self.name,
+            api=self.api,
+            uid=self.uid,
+            cultivate=cultivate,
+            player_info={},
+        )
 
     async def full_load(self) -> CharacterInfo:
         cultivate, player_info = await asyncio.gather(
-            self.load_cultivate(),
-            self.load_player_info(),
+            self.api.cultivate(self.uid),
+            self.api.player_info(self.uid),
         )
         return CharacterInfo(
             name=self.name,
@@ -74,6 +88,3 @@ class CharacterInfoLoader:
             cultivate=cultivate,
             player_info=player_info,
         )
-
-    async def __aexit__(self, *args):
-        pass

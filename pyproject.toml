@@ -10,13 +10,13 @@ dependencies = [
 ]
 
 [project.scripts]
-skland = "skland_api.cli:app"
+skland = "skland_api.cli:main"
 
 [project.optional-dependencies]
 cli = [
     "platformdirs>=4.3.8",
     "rich>=14.2.0",
-    "typer>=0.20.0",
+    "rich-click>=1.9.4",
     "wcwidth>=0.2.13",
 ]
 

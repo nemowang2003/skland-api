@@ -1,9 +1,9 @@
-import sys
 import time
 from contextlib import contextmanager
-from typing import TextIO
 
-import click
+from rich.console import Console, escape
+
+console = Console()
 
 
 def display_remain_seconds(duration: int, with_suffix: bool = True) -> str:
@@ -42,29 +42,21 @@ def display_capacity_or_progress(
         raise ValueError("'capacity' and 'progress' should be mutual exclusive")
 
     if current < total and progress or current == total and capacity:
-        fg = "red"
+        color = "red"
     else:
-        fg = "green"
-    return click.style(f"{current}/{total}", fg=fg, bold=True)
+        color = "green"
+    return f"[{color} bold]{current}/{total}[/]"
 
 
 class Formatter:
-    def __init__(self, fp: TextIO | None = None) -> None:
+    def __init__(self) -> None:
         self.indent_width: int = 0
         self.buffer: list[str] = []
         self.ready_depth: int = 0
         self.at_line_start: bool = True
 
-        self.fp = fp or sys.stdout
-
     def real_write(self, msg: str):
-        try:
-            isatty = self.fp.isatty()
-        except Exception:
-            isatty = False
-        if not isatty:
-            msg = click.unstyle(msg)
-        print(msg, end="", file=self.fp)
+        console.print(msg, end="")
 
     def write(self, *msgs: str) -> None:
         for msg in msgs:
@@ -119,7 +111,7 @@ class Formatter:
         suffix: str = "",
         **kwargs,
     ) -> None:
-        self.write(prefix, click.style(msg, **kwargs), suffix)
+        self.write(prefix, escape(msg), suffix)
 
     def write_green_bold(self, msg: str, prefix: str = "", suffix: str = "") -> None:
         self.write_style(

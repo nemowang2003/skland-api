@@ -1,81 +1,87 @@
 from pathlib import Path
-from typing import Annotated
 
 import platformdirs
-import typer
+import rich_click as click
 from loguru import logger
 
 from .common import APPNAME, GlobalOptions
-from .show import app as show_app
 from .show import show
 
-app = typer.Typer(rich_markup_mode="rich", help="Skland API CLI Tool")
-app.add_typer(show_app)
+click.rich_click.USE_RICH_MARKUP = True
+click.rich_click.SHOW_ARGUMENTS = True
+click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
+click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 
 
-@app.callback(invoke_without_command=True)
+@click.group(invoke_without_command=True, help="Skland API CLI Tool")
+@click.option(
+    "--names",
+    "names_str",
+    is_eager=True,
+    metavar="name1,name2,...",
+    help="comma-separated account names to query",
+)
+@click.option(
+    "--modules",
+    "modules_str",
+    is_eager=True,
+    metavar="module1,module2,...",
+    help="comma-separated module names to run",
+)
+@click.option(
+    "--config-dir",
+    is_eager=True,
+    envvar="SKLAND_API_CONFIG_DIR",
+    show_envvar=True,
+    type=click.Path(path_type=Path),
+    default=lambda: platformdirs.user_config_path(APPNAME, ensure_exists=True),
+    help="configuration directory",
+)
+@click.option(
+    "--cache-dir",
+    is_eager=True,
+    envvar="SKLAND_API_CACHE_DIR",
+    show_envvar=True,
+    type=click.Path(path_type=Path),
+    default=lambda: platformdirs.user_cache_path(APPNAME, ensure_exists=True),
+    help="cache directory",
+)
+@click.option(
+    "--auth-file",
+    is_eager=True,
+    envvar="SKLAND_API_AUTH_FILE",
+    show_envvar=True,
+    type=click.Path(path_type=Path),
+    help="authentication file path",
+)
+@click.option(
+    "--config-file",
+    is_eager=True,
+    envvar="SKLAND_API_CONFIG_FILE",
+    show_envvar=True,
+    type=click.Path(path_type=Path),
+    help="configuration file path",
+)
+@click.option(
+    "--log-file",
+    is_eager=True,
+    envvar="SKLAND_API_LOG_FILE",
+    show_envvar=True,
+    type=click.Path(path_type=Path),
+    help="log file path",
+)
+@click.pass_context
 def main(
-    ctx: typer.Context,
-    config_dir: Annotated[
-        Path,
-        typer.Option(
-            "--config-dir",
-            envvar="SKLAND_API_CONFIG_DIR",
-            default_factory=lambda: platformdirs.user_config_path(APPNAME, ensure_exists=True),
-            help="configuration directory",
-        ),
-    ],
-    cache_dir: Annotated[
-        Path,
-        typer.Option(
-            "--cache-dir",
-            envvar="SKLAND_API_CACHE_DIR",
-            default_factory=lambda: platformdirs.user_cache_path(APPNAME, ensure_exists=True),
-            help="cache directory",
-        ),
-    ],
-    names_str: Annotated[
-        str | None,
-        typer.Option(
-            "--names",
-            metavar="name1,name2,...",
-            help="comma-separated account names to query",
-        ),
-    ] = None,
-    modules_str: Annotated[
-        str | None,
-        typer.Option(
-            "--modules",
-            metavar="module1,module2,...",
-            help="comma-separated module names to run",
-        ),
-    ] = None,
-    auth_file: Annotated[
-        Path | None,
-        typer.Option(
-            "--auth-file",
-            envvar="SKLAND_API_AUTH_FILE",
-            help="authentication file path",
-        ),
-    ] = None,
-    config_file: Annotated[
-        Path | None,
-        typer.Option(
-            "--config-file",
-            envvar="SKLAND_API_CONFIG_FILE",
-            help="configuration file path",
-        ),
-    ] = None,
-    log_file: Annotated[
-        Path | None,
-        typer.Option(
-            "--log-file",
-            envvar="SKLAND_API_LOG_FILE",
-            help="log file path",
-        ),
-    ] = None,
+    ctx: click.Context,
+    names_str: str | None,
+    modules_str: str | None,
+    config_dir: Path,
+    cache_dir: Path,
+    auth_file: Path | None,
+    config_file: Path | None,
+    log_file: Path | None,
 ):
-    global_options = GlobalOptions.construct_with_fallback(
+    global_options = GlobalOptions.from_command_line_options(
         names=names_str.split(",") if names_str is not None else None,
         modules=modules_str.split(",") if modules_str is not None else None,
         config_dir=config_dir,
@@ -84,8 +90,13 @@ def main(
         cache_dir=cache_dir,
         log_file=log_file,
     )
+
     logger.add(global_options.log_file)
+
     ctx.obj = global_options
 
     if ctx.invoked_subcommand is None:
-        show(ctx)
+        ctx.invoke(show)
+
+
+main.add_command(show)

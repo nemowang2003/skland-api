@@ -5,7 +5,7 @@ from loguru import logger
 from .api import SklandApi, SklandApiException
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, slots=True)
 class SklandAuthInfo:
     phone: str | None = None
     password: str | None = None
