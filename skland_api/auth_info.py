@@ -1,5 +1,6 @@
-import logging
 from dataclasses import asdict, dataclass
+
+from loguru import logger
 
 from .api import SklandApi, SklandApiException
 
@@ -28,36 +29,31 @@ class SklandAuthInfo:
         if not any((self.phone, self.password, self.token, self.cred)):
             raise ValueError("must present at least one piece of valid information")
 
-    def as_dict(self) -> dict:
+    def to_dict(self) -> dict:
         return asdict(self)
 
-    def full_auth(self) -> SklandApi:
+    async def full_auth(self) -> SklandApi:
         api = SklandApi()
         if self.cred is not None:
             try:
-                api.set_cred(self.cred)
+                await api.set_cred(self.cred)
                 return api
-            except SklandApiException as e:
-                logging.warning(f"failed to get auth from cred: {e}")
-        else:
-            logging.warning("missing cred")
+            except SklandApiException:
+                logger.warning("failed to get auth from cred")
 
         if self.token is not None:
             try:
-                self.cred = api.cred_from_token(self.token)
+                self.cred = await api.cred_from_token(self.token)
                 return api
-            except SklandApiException as e:
-                logging.warning(f"failed to get auth from token: {e}")
-        else:
-            logging.warning("missing token")
+            except SklandApiException:
+                logger.warning("failed to get auth from token")
+
         if self.phone is not None and self.password is not None:
             try:
-                self.token = api.token_from_phone_password(self.phone, self.password)
-                self.cred = api.cred_from_token(self.token)
+                self.token = await api.token_from_phone_password(self.phone, self.password)
+                self.cred = await api.cred_from_token(self.token)
                 return api
-            except SklandApiException as e:
-                logging.warning(f"failed to get auth from phone and password: {e}")
-        else:
-            logging.error("missing phone and password, failed to auth")
+            except SklandApiException:
+                logger.exception("failed to get auth from phone and password")
 
         raise ValueError("all provided information failed to auth")

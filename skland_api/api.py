@@ -3,33 +3,41 @@ import hmac
 import json
 import time
 import urllib.parse
+from collections.abc import Generator
+from typing import Literal, Never
 
-import requests
+import httpx
 
 APP_CODE = "4ca99fa6b56cc2ba"  # magic code
 
 
 class SklandApiException(Exception):
-    def __init__(self, code: int, msg: str):
+    def __init__(self, code: int, msg: str, response: httpx.Response):
         self.code = code
         self.msg = msg
+        self.response = response
 
     def __str__(self):
-        return f"{self.__class__.__name__}: ({self.code}) {self.msg}"
+        url = urllib.parse.unquote(str(self.response.url))
+        return f"[{self.response.request.method} {url}] ({self.code}) {self.msg}"
 
 
-class SklandClient:
-    def __init__(self):
-        self.token = None
-        self.session = requests.Session()
-        self.headers = {
-            "User-Agent": "Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0",
-            "Accept-Encoding": "gzip",
-            "Connection": "close",
-        }
+class SklandClientAuth(httpx.Auth):
+    def __init__(self, token: str | None):
+        self.token = token
 
-    @staticmethod
-    def sign(path: str, token: str, payload: str) -> dict:
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response]:
+        if not self.token:
+            yield request
+            return
+
+        path = request.url.path
+
+        if request.method == "GET":
+            payload = request.url.query.decode("utf-8")
+        else:
+            payload = request.content.decode("utf-8") if request.content else ""
+
         timestamp = str(int(time.time()))
         payload_to_sign = "".join(
             [
@@ -42,18 +50,33 @@ class SklandClient:
             ]
         )
         encrypted = hmac.new(
-            token.encode("utf-8"),
+            self.token.encode("utf-8"),
             payload_to_sign.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         sign = hashlib.md5(encrypted.encode("utf-8")).hexdigest()
-        return {
-            "sign": sign,
-            "platform": "",
-            "timestamp": timestamp,
-            "dId": "",
-            "vName": "",
-        }
+        request.headers.update(
+            {
+                "sign": sign,
+                "platform": "",
+                "timestamp": timestamp,
+                "dId": "",
+                "vName": "",
+            }
+        )
+        yield request
+
+
+class SklandClient:
+    def __init__(self) -> None:
+        self.client: httpx.AsyncClient = httpx.AsyncClient(
+            auth=SklandClientAuth(None),
+            headers={
+                "User-Agent": "Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0",
+                "Accept-Encoding": "gzip",
+                "Connection": "close",
+            },
+        )
 
     @property
     def cred(self):
@@ -61,56 +84,57 @@ class SklandClient:
 
     @cred.setter
     def cred(self, cred: str):
-        self.headers = {"cred": cred} | self.headers
+        self.client.headers = httpx.Headers(
+            {"cred": cred} | {k: v for k, v in self.client.headers.items() if k.lower() != "cred"}
+        )
 
     @cred.deleter
     def cred(self):
-        self.headers.pop("cred", default=None)
+        self.client.headers.pop("cred", default=None)
 
-    def get(self, url, **kwargs):
-        if self.token is not None:
-            parse_result = urllib.parse.urlparse(url)
-            path = parse_result.path
-            payload = parse_result.query
-            self.headers |= self.sign(path, self.token, payload)
-        response = self.session.get(url, headers=self.headers, **kwargs)
+    @property
+    def token(self) -> Never:
+        raise AttributeError(
+            f"cannot read attribute 'token' from {self.__class__.__name__!r} (I think it doesn't make sense)"
+        )
+
+    @token.setter
+    def token(self, token: str):
+        self.client.auth = SklandClientAuth(token)
+
+    async def request(self, method: Literal["GET", "POST"], url: str, **kwargs):
+        response = await self.client.request(method, url, **kwargs)
         try:
             response = response.json()
         except json.JSONDecodeError:
-            return response.text
+            preview = response.text[:50].replace("\n", " ")
+            raise SklandApiException(
+                code=-1,
+                msg=f"响应解析失败(非json): {preview}",
+                response=response,
+            ) from None
         code = response.get("status", 0) or response.get("code", 0)
         if code != 0:
             raise SklandApiException(
                 code=code,
                 msg=response.get("msg") or response.get("message", ""),
+                response=response,
             )
         return response
 
-    def post(self, url, **kwargs):
-        if self.token is not None:
-            path = urllib.parse.urlparse(url).path
-            payload = kwargs.get("data") or json.dumps(kwargs.get("json", dict()))
-            self.headers |= self.sign(path, self.token, payload)
-        response = self.session.post(url, headers=self.headers, **kwargs)
-        try:
-            response = response.json()
-        except json.JSONDecodeError:
-            return response.text
-        code = response.get("status", 0) or response.get("code", 0)
-        if code != 0:
-            raise SklandApiException(
-                code=code,
-                msg=response.get("msg") or response.get("message", ""),
-            )
-        return response
+    async def get(self, url: str, **kwargs) -> dict:
+        return await self.request("GET", url, **kwargs)
+
+    async def post(self, url: str, **kwargs) -> dict:
+        return await self.request("POST", url, **kwargs)
 
 
 class SklandApi:
     def __init__(self):
         self.client = SklandClient()
 
-    def token_from_phone_password(self, phone: str, password: str) -> str:
-        response = self.client.post(
+    async def token_from_phone_password(self, phone: str, password: str) -> str:
+        response = await self.client.post(
             "https://as.hypergryph.com/user/auth/v1/token_by_phone_password",
             json={
                 "phone": phone,
@@ -119,8 +143,8 @@ class SklandApi:
         )
         return response["data"]["token"]
 
-    def cred_from_token(self, token: str) -> str:
-        response = self.client.post(
+    async def cred_from_token(self, token: str) -> str:
+        response = await self.client.post(
             "https://as.hypergryph.com/user/oauth2/v2/grant",
             json={
                 "token": token,
@@ -130,7 +154,7 @@ class SklandApi:
         )
         grant_code = response["data"]["code"]
 
-        response = self.client.post(
+        response = await self.client.post(
             "https://zonai.skland.com/api/v1/user/auth/generate_cred_by_code",
             json={
                 "code": grant_code,
@@ -142,34 +166,39 @@ class SklandApi:
         self.client.token = data["token"]
         return cred
 
-    def set_cred(self, cred: str):
+    async def set_cred(self, cred: str):
         self.client.cred = cred
-        self.client.token = self.client.get("https://zonai.skland.com/api/v1/auth/refresh")["data"][
-            "token"
-        ]
+        response = await self.client.get("https://zonai.skland.com/api/v1/auth/refresh")
+        self.client.token = response["data"]["token"]
 
-    def binding_list(self) -> list[dict]:
-        response = self.client.get("https://zonai.skland.com/api/v1/game/player/binding")
+    async def binding_list(self) -> list[dict]:
+        response = await self.client.get("https://zonai.skland.com/api/v1/game/player/binding")
         return [character for game in response["data"]["list"] for character in game["bindingList"]]
 
-    def cultivate(self, uid: str) -> dict:
-        return self.client.get(f"https://zonai.skland.com/api/v1/game/cultivate/player?uid={uid}")[
-            "data"
-        ]
+    async def cultivate(self, uid: str) -> dict:
+        response = await self.client.get(
+            f"https://zonai.skland.com/api/v1/game/cultivate/player?uid={uid}"
+        )
+        return response["data"]
 
-    def player_info(self, uid: str) -> dict:
-        return self.client.get(f"https://zonai.skland.com/api/v1/game/player/info?uid={uid}")[
-            "data"
-        ]
+    async def player_info(self, uid: str) -> dict:
+        response = await self.client.get(
+            f"https://zonai.skland.com/api/v1/game/player/info?uid={uid}"
+        )
+        return response["data"]
 
-    def daily_sign_info(self, uid: str) -> dict:
-        return self.client.get(f"https://zonai.skland.com/api/v1/game/attendance?uid={uid}")["data"]
+    async def daily_sign_info(self, uid: str) -> dict:
+        response = await self.client.get(
+            f"https://zonai.skland.com/api/v1/game/attendance?uid={uid}"
+        )
+        return response["data"]
 
-    def do_daily_sign(self, uid: str) -> list[dict]:
-        return self.client.post(
+    async def do_daily_sign(self, uid: str) -> list[dict]:
+        response = await self.client.post(
             "https://zonai.skland.com/api/v1/game/attendance",
             json={
                 "gameId": 1,
                 "uid": uid,
             },
-        )["data"]["awards"]
+        )
+        return response["data"]["awards"]

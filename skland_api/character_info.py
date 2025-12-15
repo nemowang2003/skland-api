@@ -1,3 +1,5 @@
+import asyncio
+from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
@@ -5,28 +7,19 @@ from . import constants
 from .api import SklandApi
 
 
+@dataclass(frozen=True, kw_only=True)
 class CharacterInfo:
-    def __init__(self, name: str, api: SklandApi, character: dict):
-        self.name = name
-        self.api = api
-        self.uid = character["uid"]
-        self.game_id = character["nickName"]
-
-    @cached_property
-    def player_info(self) -> dict:
-        player_info = self.api.player_info(self.uid)
-        return player_info
+    name: str
+    api: SklandApi
+    uid: str
+    cultivate: dict
+    player_info: dict
 
     @cached_property
     def operator_mapping(self) -> dict:
         return {
             entry["id"]: entry["name"] for entry in self.player_info["charInfoMap"].values()
         } | constants.OPERATOR_MAPPING_FIX
-
-    @cached_property
-    def cultivate(self) -> dict:
-        cultivate = self.api.cultivate(self.uid)
-        return cultivate
 
     @cached_property
     def operators(self) -> dict:
@@ -55,3 +48,32 @@ class CharacterInfo:
         file = cache_path / f"{self.name}-{self.uid}-cultivate.json"
         with file.open(mode="w", encoding="utf-8") as fp:
             json.dump(self.cultivate, fp, ensure_ascii=False, indent=2)
+
+
+class CharacterInfoLoader:
+    def __init__(self, name: str, api: SklandApi, character: dict):
+        self.name = name
+        self.api = api
+        self.uid = character["uid"]
+
+    async def load_cultivate(self) -> dict:
+        return await self.api.cultivate(self.uid)
+
+    async def load_player_info(self) -> dict:
+        return await self.api.player_info(self.uid)
+
+    async def full_load(self) -> CharacterInfo:
+        cultivate, player_info = await asyncio.gather(
+            self.load_cultivate(),
+            self.load_player_info(),
+        )
+        return CharacterInfo(
+            name=self.name,
+            api=self.api,
+            uid=self.uid,
+            cultivate=cultivate,
+            player_info=player_info,
+        )
+
+    async def __aexit__(self, *args):
+        pass
