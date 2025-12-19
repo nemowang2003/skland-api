@@ -13,8 +13,6 @@ from skland_api.cli.utils import (
     display_timestamp,
 )
 
-logger = logging.getLogger(__name__)
-
 TOTAL_TRAIN_POINT = 30000
 STAMINA_DIVIDOR = 360000
 STAMINA_REDLINE = 8

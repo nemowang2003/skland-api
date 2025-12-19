@@ -79,8 +79,8 @@ class SklandClient:
         )
 
     @property
-    def cred(self):
-        return self.headers.get("cred")
+    def cred(self) -> str | None:
+        return self.client.headers.get("cred")
 
     @cred.setter
     def cred(self, cred: str):

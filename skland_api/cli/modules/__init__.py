@@ -1,6 +1,7 @@
 import importlib
-import logging
 import pkgutil
+
+from loguru import logger
 
 default_modules = [
     "title",
@@ -25,11 +26,11 @@ def _load_registry() -> dict:
             if hasattr(module, "main"):
                 _registry[name] = module.main
             else:
-                logging.warning(f"module {name!r} has no entrypoint 'main'")
+                logger.warning(f"module {name!r} has no entrypoint 'main'")
         except ImportError:
-            logging.exception(f"failed to import module {name!r}")
+            logger.exception(f"failed to import module {name!r}")
         except Exception:
-            logging.exception(f"internal error in module {name!r}")
+            logger.exception(f"internal error in module {name!r}")
     return _registry
 
 
