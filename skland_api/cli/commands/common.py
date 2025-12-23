@@ -83,7 +83,7 @@ class GlobalOptions:
             if (config_modules := config.get("modules")) is not None:
                 modules = config_modules
             else:
-                from skland_api.cli.modules import default_modules
+                from skland_api.modules import default_modules
 
                 modules = default_modules
         unique_modules = list(dict.fromkeys(modules))

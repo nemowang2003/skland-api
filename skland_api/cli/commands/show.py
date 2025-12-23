@@ -32,7 +32,7 @@ async def show(
     loaded_modules: list[LoadedModule] = []
     for module_name in global_options.modules:
         try:
-            entry = importlib.import_module(f"skland_api.cli.modules.{module_name}").main
+            entry = importlib.import_module(f"skland_api.modules.{module_name}").main
             loaded_modules.append(
                 LoadedModule(
                     name=module_name,

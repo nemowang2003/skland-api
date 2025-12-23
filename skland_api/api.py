@@ -90,7 +90,7 @@ class SklandClient:
 
     @cred.deleter
     def cred(self):
-        self.client.headers.pop("cred", default=None)
+        self.client.headers.pop("cred", None)
 
     @property
     def token(self) -> Never:

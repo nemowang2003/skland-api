@@ -1,36 +1,6 @@
 """
 由于backend.yituliu提供的物品映射表不完整，目前使用手工硬编码，参照:
 https://raw.githubusercontent.com/arkntools/arknights-toolbox-data/98f764fd43be105aef386e7ced4a72d3bf1fe7b3/assets/locales/cn/material.json
-
-def __getattr__(name):
-    if name == "ITEM_MAPPING":
-        global ITEM_MAPPING
-        import json
-        import time
-
-        ITEM_FILE = CACHE_DIR / "item_mapping.json"
-        if (
-            not ITEM_FILE.exists()
-            or time.time() - ITEM_FILE.stat().st_mtime > 7 * 24 * 60 * 60
-        ):
-            import requests
-
-            try:
-                response = requests.get("https://backend.yituliu.cn/item/value").json()
-                if response["code"] == 200:
-                    ITEM_MAPPING = {
-                        entry["itemId"]: entry["itemName"] for entry in response["data"]
-                    }
-                    with ITEM_FILE.open(mode="w", encoding="utf-8") as fp:
-                        json.dump(ITEM_MAPPING, fp, ensure_ascii=False, indent=2)
-                    return ITEM_MAPPING
-            except Exception:
-                pass
-
-        with ITEM_FILE.open(mode="r", encoding="utf-8") as fp:
-            ITEM_MAPPING = json.load(fp)
-        return ITEM_MAPPING
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 """
 
 OPERATOR_MAPPING_FIX = {
