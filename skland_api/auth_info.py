@@ -15,19 +15,19 @@ class SklandAuthInfo:
     def __post_init__(self):
         if self.phone is not None:
             if len(self.phone) != 11 or not self.phone.isdigit():
-                raise ValueError("invalid phone number (expected length: 11)")
+                raise ValueError("手机号格式不正确（应为 11 位数字）")
 
         if self.token is not None and len(self.token) != 24:
-            raise ValueError("invalid token (expected length: 24)")
+            raise ValueError("Token 长度不正确（应为 24 位）")
 
         if self.cred is not None and len(self.cred) != 32:
-            raise ValueError("invalid cred (expected length: 32)")
+            raise ValueError("Cred 长度不正确（应为 32 位）")
 
         if bool(self.phone) ^ bool(self.password):
-            raise ValueError("phone and password must be provided together")
+            raise ValueError("请同时提供手机号和密码")
 
         if not any((self.phone, self.password, self.token, self.cred)):
-            raise ValueError("must present at least one piece of valid information")
+            raise ValueError("请至少提供一项有效的认证信息")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -53,7 +53,7 @@ class SklandAuthInfo:
                 self.token = await api.token_from_phone_password(self.phone, self.password)
                 self.cred = await api.cred_from_token(self.token)
                 return api
-            except SklandApiException:
-                logger.exception("failed to get auth from phone and password")
+            except SklandApiException as e:
+                logger.error(f"failed to get auth from phone and password: {e}")
 
         raise ValueError("all provided information failed to auth")

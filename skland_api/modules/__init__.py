@@ -3,17 +3,6 @@ import pkgutil
 
 from loguru import logger
 
-default_modules = [
-    "title",
-    "sign",
-    "online",
-    "stamina",
-    "affair",
-    "mission",
-    "recruit",
-    "base",
-]
-
 _registry: dict = {}
 
 
@@ -27,8 +16,6 @@ def _load_registry() -> dict:
                 _registry[name] = module.main
             else:
                 logger.warning(f"module {name!r} has no entrypoint 'main'")
-        except ImportError:
-            logger.exception(f"failed to import module {name!r}")
         except Exception:
             logger.exception(f"internal error in module {name!r}")
     return _registry
@@ -41,6 +28,5 @@ def __getattr__(name: str):
 
 
 __all__ = [
-    "default_modules",
     "registry",
 ]

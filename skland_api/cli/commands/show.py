@@ -8,7 +8,7 @@ from typing import Callable
 import rich_click as click
 from loguru import logger
 
-from skland_api import CharacterInfo, CharacterInfoLoader, SklandAuthInfo
+from skland_api import CharacterInfo, CharacterInfoLoader, SklandApiException, SklandAuthInfo
 
 from .common import GlobalOptions, async_command
 
@@ -22,15 +22,44 @@ class LoadedModule:
 
 
 @click.command()
+@click.option(
+    "--modules",
+    "modules_str",
+    metavar="module1,module2,...",
+    help="comma-separated module names to run",
+)
 @click.pass_context
 @async_command
 async def show(
     ctx: click.Context,
+    modules_str: str | None = None,
 ) -> None:
     global_options: GlobalOptions = ctx.obj
 
+    if modules_str is not None:
+        modules = modules_str.split(",")
+    elif (config_modules := global_options.config.get("modules")) is not None:
+        modules = config_modules
+    else:
+        # default modules
+        modules = [
+            "title",
+            "sign",
+            "online",
+            "stamina",
+            "affair",
+            "mission",
+            "recruit",
+            "base",
+        ]
+
+    unique_modules = list(dict.fromkeys(modules))
+    if modules != unique_modules:
+        logger.warning("Duplicate modules found, duplicates will be ignored.")
+        modules = unique_modules
+
     loaded_modules: list[LoadedModule] = []
-    for module_name in global_options.modules:
+    for module_name in modules:
         try:
             entry = importlib.import_module(f"skland_api.modules.{module_name}").main
             loaded_modules.append(
@@ -42,7 +71,7 @@ async def show(
                 )
             )
         except ImportError:
-            logger.exception(f"{module_name!r} is not a valid module")
+            logger.error(f"{module_name!r} is not a valid module")
 
     async def fetch_character_info(name: str) -> list[CharacterInfo]:
         if (info := global_options.auth.get(name)) is None:
@@ -52,13 +81,13 @@ async def show(
             auth_info = SklandAuthInfo(**info)
             api = await auth_info.full_auth()
             info.update(auth_info.to_dict())
-        except Exception:
-            logger.exception(f"User {name} login failed")
+        except ValueError:
+            logger.error(f"User {name} login failed")
             return []
         try:
             characters = await api.binding_list()
-        except Exception:
-            logger.exception(f"User {name} fetch binding list failed")
+        except SklandApiException as e:
+            logger.error(f"User {name} fetch binding list failed: {e}")
             return []
 
         loader_tasks = [
@@ -69,7 +98,7 @@ async def show(
 
         results = await asyncio.gather(*loader_tasks, return_exceptions=True)
 
-        char_infos = []
+        char_infos: list[CharacterInfo] = []
         for result in results:
             if isinstance(result, BaseException):
                 logger.error(f"Failed to load character info: {result}")
@@ -93,5 +122,6 @@ async def show(
                 else:
                     module.entry(character_info, module.config)
             except Exception:
-                logger.exception(f"Module {module.name!r} execution failed")
-                raise
+                logger.exception(
+                    f"Module {module.name!r} execution failed for {character_info.name!r}"
+                )

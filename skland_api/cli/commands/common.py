@@ -20,7 +20,6 @@ APPNAME = "skland-api"
 @dataclass(frozen=True, kw_only=True, slots=True)
 class GlobalOptions:
     names: list[str]
-    modules: list[str]
     cache_dir: Path
     auth_file: Path
     log_file: Path
@@ -35,7 +34,6 @@ class GlobalOptions:
     def from_command_line_options(
         cls,
         names: list[str] | None,
-        modules: list[str] | None,
         config_dir: Path,
         auth_file: Path | None,
         config_file: Path | None,
@@ -79,21 +77,8 @@ class GlobalOptions:
             logger.warning("Duplicate names found, duplicates will be ignored.")
             names = unique_names
 
-        if modules is None:
-            if (config_modules := config.get("modules")) is not None:
-                modules = config_modules
-            else:
-                from skland_api.modules import default_modules
-
-                modules = default_modules
-        unique_modules = list(dict.fromkeys(modules))
-        if modules != unique_modules:
-            logger.warning("Duplicate modules found, duplicates will be ignored.")
-            modules = unique_modules
-
         return cls(
             names=names,
-            modules=modules,
             cache_dir=cache_dir,
             auth_file=auth_file,
             log_file=log_file,
@@ -104,7 +89,6 @@ class GlobalOptions:
 
 def create_auth_file(file: Path) -> None:
     if file.exists():
-        logger.error(f"File {file} already exists when calling create_auth_file.")
         raise FileExistsError(file)
 
     while True:
@@ -155,14 +139,13 @@ def create_auth_file(file: Path) -> None:
             console.print(f"[bold red]Invalid information:[/]\n  {e}")
             console.print("[yellow]Please try again...[/]\n")
 
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             console.print("\n[bold yellow]! Aborted by user.[/]")
             raise click.Abort()
 
 
 def create_config_file(file: Path):
     if file.exists():
-        logger.error(f"File {file} already exists when calling create_config_file.")
         raise FileExistsError(file)
     try:
         with file.open("w", encoding="utf-8") as fp:

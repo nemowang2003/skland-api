@@ -1,13 +1,12 @@
-"""
-由于backend.yituliu提供的物品映射表不完整，目前使用手工硬编码，参照:
-https://raw.githubusercontent.com/arkntools/arknights-toolbox-data/98f764fd43be105aef386e7ced4a72d3bf1fe7b3/assets/locales/cn/material.json
-"""
-
 OPERATOR_MAPPING_FIX = {
     "char_1001_amiya2": "阿米娅(近卫)",
     "char_1037_amiya3": "阿米娅(医疗)",
 }
 
+# Manually hard-coded due to incomplete mapping from backend.yituliu.cn
+# Should be synchronized with:
+# https://raw.githubusercontent.com/arkntools/arknights-toolbox-data/main/assets/locales/cn/material.json
+# Last synced with commit: 98f764fd43be105aef386e7ced4a72d3bf1fe7b3
 ITEM_MAPPING: dict[str, str] = {
     "3211": "先锋芯片",
     "3212": "先锋芯片组",

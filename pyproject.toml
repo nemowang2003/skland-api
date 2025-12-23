@@ -1,13 +1,16 @@
 [project]
 name = "skland-api"
 version = "0.1.2"
-description = "Add your description here"
+description = "An unofficial Python API client and CLI for Skland. Features automated Arknights check-ins and comprehensive data tracking."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "httpx>=0.28.1",
     "loguru>=0.7.3",
 ]
+
+[project.urls]
+"Repository" = "https://github.com/Nemowang2003/skland-api"
 
 [project.scripts]
 skland = "skland_api.cli:main"

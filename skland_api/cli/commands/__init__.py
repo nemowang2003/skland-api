@@ -17,20 +17,11 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 @click.option(
     "--names",
     "names_str",
-    is_eager=True,
     metavar="name1,name2,...",
     help="comma-separated account names to query",
 )
 @click.option(
-    "--modules",
-    "modules_str",
-    is_eager=True,
-    metavar="module1,module2,...",
-    help="comma-separated module names to run",
-)
-@click.option(
     "--config-dir",
-    is_eager=True,
     envvar="SKLAND_API_CONFIG_DIR",
     show_envvar=True,
     type=click.Path(path_type=Path),
@@ -39,7 +30,6 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 )
 @click.option(
     "--cache-dir",
-    is_eager=True,
     envvar="SKLAND_API_CACHE_DIR",
     show_envvar=True,
     type=click.Path(path_type=Path),
@@ -48,7 +38,6 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 )
 @click.option(
     "--auth-file",
-    is_eager=True,
     envvar="SKLAND_API_AUTH_FILE",
     show_envvar=True,
     type=click.Path(path_type=Path),
@@ -56,7 +45,6 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 )
 @click.option(
     "--config-file",
-    is_eager=True,
     envvar="SKLAND_API_CONFIG_FILE",
     show_envvar=True,
     type=click.Path(path_type=Path),
@@ -64,7 +52,6 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 )
 @click.option(
     "--log-file",
-    is_eager=True,
     envvar="SKLAND_API_LOG_FILE",
     show_envvar=True,
     type=click.Path(path_type=Path),
@@ -74,7 +61,6 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 def main(
     ctx: click.Context,
     names_str: str | None,
-    modules_str: str | None,
     config_dir: Path,
     cache_dir: Path,
     auth_file: Path | None,
@@ -83,7 +69,6 @@ def main(
 ):
     global_options = GlobalOptions.from_command_line_options(
         names=names_str.split(",") if names_str is not None else None,
-        modules=modules_str.split(",") if modules_str is not None else None,
         config_dir=config_dir,
         auth_file=auth_file,
         config_file=config_file,

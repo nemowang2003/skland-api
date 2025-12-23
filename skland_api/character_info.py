@@ -56,7 +56,7 @@ class CharacterInfoLoader:
         self.api = api
         self.uid = character["uid"]
 
-    async def partial_load_cultivate(self) -> CharacterInfo:
+    async def only_load_cultivate(self) -> CharacterInfo:
         cultivate = await self.api.cultivate(self.uid)
         return CharacterInfo(
             name=self.name,
@@ -66,14 +66,14 @@ class CharacterInfoLoader:
             player_info={},
         )
 
-    async def partial_load_player_info(self) -> CharacterInfo:
-        cultivate = await self.api.player_info(self.uid)
+    async def only_load_player_info(self) -> CharacterInfo:
+        player_info = await self.api.player_info(self.uid)
         return CharacterInfo(
             name=self.name,
             api=self.api,
             uid=self.uid,
-            cultivate=cultivate,
-            player_info={},
+            cultivate={},
+            player_info=player_info,
         )
 
     async def full_load(self) -> CharacterInfo:
