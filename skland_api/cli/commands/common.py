@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Self
 
 import rich_click as click
-from loguru import logger
 from rich.panel import Panel
 from rich.prompt import Prompt
 
@@ -19,7 +18,6 @@ APPNAME = "skland-api"
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class GlobalOptions:
-    names: list[str]
     cache_dir: Path
     auth_file: Path
     log_file: Path
@@ -33,7 +31,6 @@ class GlobalOptions:
     @classmethod
     def from_command_line_options(
         cls,
-        names: list[str] | None,
         config_dir: Path,
         auth_file: Path | None,
         config_file: Path | None,
@@ -67,18 +64,7 @@ class GlobalOptions:
         else:
             log_file = cache_dir / f"{APPNAME}.log"
 
-        if names is None:
-            if (config_names := config.get("names")) is not None:
-                names = config_names
-            else:
-                names = list(auth.keys())
-        unique_names = list(dict.fromkeys(names))
-        if names != unique_names:
-            logger.warning("Duplicate names found, duplicates will be ignored.")
-            names = unique_names
-
         return cls(
-            names=names,
             cache_dir=cache_dir,
             auth_file=auth_file,
             log_file=log_file,
@@ -150,7 +136,7 @@ def create_config_file(file: Path):
     try:
         with file.open("w", encoding="utf-8") as fp:
             json.dump(
-                {"names": None, "modules": None, "module-config": {}},
+                {"module-config": {}},
                 fp,
                 ensure_ascii=True,
                 indent=2,

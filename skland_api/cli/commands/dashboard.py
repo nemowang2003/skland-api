@@ -23,23 +23,53 @@ class LoadedModule:
 
 @click.command(name="dashboard")
 @click.option(
+    "--names",
+    "names_str",
+    metavar="name1,name2,...",
+    help="要查询的账号名称列表，使用逗号分割",
+)
+@click.option(
     "--modules",
     "modules_str",
     metavar="module1,module2,...",
-    help="comma-separated module names to run",
+    help="要运行的功能模块列表，使用逗号分隔",
 )
 @click.pass_context
 @async_command
 async def dashboard(
     ctx: click.Context,
+    names_str: str | None = None,
     modules_str: str | None = None,
 ) -> None:
+    """展示明日方舟游戏数据看板。
+
+    该命令会遍历配置中的所有账号，获取其绑定的角色信息，并依次执行指定的功能模块。支持的模块包括:
+
+    - title   : 角色ID
+    - checkin : 每日签到
+    - online  : 上次在线状态
+    - stamina : 当前理智
+    - affair  : 剿灭/保全派驻进度
+    - mission : 每日/每周任务进度
+    - recruit : 公开招募进度
+    - base    : 基建概览
+
+    如果没有指定 --modules，将按顺序运行上述所有默认模块。
+    """
     global_options: GlobalOptions = ctx.obj
+
+    if names_str is not None:
+        names = names_str.split(",")
+    else:
+        names = list(global_options.auth.keys())
+
+    unique_names = list(dict.fromkeys(names))
+    if names != unique_names:
+        logger.warning("Duplicate names found, duplicates will be ignored.")
+        names = unique_names
 
     if modules_str is not None:
         modules = modules_str.split(",")
-    elif (config_modules := global_options.config.get("modules")) is not None:
-        modules = config_modules
     else:
         # default modules
         modules = [
@@ -108,9 +138,7 @@ async def dashboard(
 
         return char_infos
 
-    all_character_info = await asyncio.gather(
-        *[fetch_character_info(name) for name in global_options.names]
-    )
+    all_character_info = await asyncio.gather(*[fetch_character_info(name) for name in names])
 
     global_options.update_auth_file()
 

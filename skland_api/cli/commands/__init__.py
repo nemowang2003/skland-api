@@ -13,20 +13,14 @@ click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
 click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
 
 
-@click.group(invoke_without_command=True, help="Skland API CLI Tool")
-@click.option(
-    "--names",
-    "names_str",
-    metavar="name1,name2,...",
-    help="comma-separated account names to query",
-)
+@click.group(help="森空岛 (Skland) API 命令行工具")
 @click.option(
     "--config-dir",
     envvar="SKLAND_API_CONFIG_DIR",
     show_envvar=True,
     type=click.Path(path_type=Path),
     default=lambda: platformdirs.user_config_path(APPNAME, ensure_exists=True),
-    help="configuration directory",
+    help="配置文件存放目录",
 )
 @click.option(
     "--cache-dir",
@@ -34,33 +28,32 @@ click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
     show_envvar=True,
     type=click.Path(path_type=Path),
     default=lambda: platformdirs.user_cache_path(APPNAME, ensure_exists=True),
-    help="cache directory",
+    help="缓存文件存放目录",
 )
 @click.option(
     "--auth-file",
     envvar="SKLAND_API_AUTH_FILE",
     show_envvar=True,
     type=click.Path(path_type=Path),
-    help="authentication file path",
+    help="认证信息文件 (auth.json) 的具体路径",
 )
 @click.option(
     "--config-file",
     envvar="SKLAND_API_CONFIG_FILE",
     show_envvar=True,
     type=click.Path(path_type=Path),
-    help="configuration file path",
+    help="配置文件 (config.json) 的具体路径",
 )
 @click.option(
     "--log-file",
     envvar="SKLAND_API_LOG_FILE",
     show_envvar=True,
     type=click.Path(path_type=Path),
-    help="log file path",
+    help="日志文件的输出路径",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    names_str: str | None,
     config_dir: Path,
     cache_dir: Path,
     auth_file: Path | None,
@@ -68,7 +61,6 @@ def main(
     log_file: Path | None,
 ):
     global_options = GlobalOptions.from_command_line_options(
-        names=names_str.split(",") if names_str is not None else None,
         config_dir=config_dir,
         auth_file=auth_file,
         config_file=config_file,
@@ -79,9 +71,6 @@ def main(
     logger.add(global_options.log_file)
 
     ctx.obj = global_options
-
-    if ctx.invoked_subcommand is None:
-        ctx.invoke(dashboard)
 
 
 main.add_command(dashboard)
