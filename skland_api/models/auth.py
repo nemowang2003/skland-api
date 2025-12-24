@@ -2,11 +2,11 @@ from dataclasses import asdict, dataclass
 
 from loguru import logger
 
-from .api import SklandApi, SklandApiException
+from skland_api import SklandApi, SklandApiException
 
 
 @dataclass(kw_only=True, slots=True)
-class SklandAuthInfo:
+class AuthInfo:
     phone: str | None = None
     password: str | None = None
     token: str | None = None

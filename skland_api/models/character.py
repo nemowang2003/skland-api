@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-from . import constants
-from .api import SklandApi
+from skland_api import SklandApi, constants
 
 
 # Cannot use frozen=True and slots=True because of cached_property

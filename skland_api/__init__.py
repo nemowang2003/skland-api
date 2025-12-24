@@ -1,11 +1,10 @@
 from .api import SklandApi, SklandApiException
-from .auth_info import SklandAuthInfo
-from .character_info import CharacterInfo, CharacterInfoLoader
+from .models import AuthInfo, CharacterInfo, CharacterInfoLoader
 
 __all__ = [
-    "SklandApi",
-    "SklandApiException",
-    "SklandAuthInfo",
+    "AuthInfo",
     "CharacterInfo",
     "CharacterInfoLoader",
+    "SklandApi",
+    "SklandApiException",
 ]

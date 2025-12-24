@@ -11,7 +11,7 @@ from loguru import logger
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from skland_api import SklandAuthInfo
+from skland_api import AuthInfo
 from skland_api.cli.utils import console
 
 APPNAME = "skland-api"
@@ -115,7 +115,7 @@ def create_auth_file(file: Path) -> None:
             token = Prompt.ask("Token", default=None)
             cred = Prompt.ask("Cred", default=None)
 
-            auth_info = SklandAuthInfo(
+            auth_info = AuthInfo(
                 phone=phone,
                 password=password,
                 token=token,

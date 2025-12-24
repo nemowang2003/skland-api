@@ -187,13 +187,13 @@ class SklandApi:
         )
         return response["data"]
 
-    async def daily_sign_info(self, uid: str) -> dict:
+    async def get_daily_checkin_status(self, uid: str) -> dict:
         response = await self.client.get(
             f"https://zonai.skland.com/api/v1/game/attendance?uid={uid}"
         )
         return response["data"]
 
-    async def do_daily_sign(self, uid: str) -> list[dict]:
+    async def execute_daily_checkin(self, uid: str) -> list[dict]:
         response = await self.client.post(
             "https://zonai.skland.com/api/v1/game/attendance",
             json={

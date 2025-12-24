@@ -5,7 +5,7 @@ import rich_click as click
 from loguru import logger
 
 from .common import APPNAME, GlobalOptions
-from .show import show
+from .dashboard import dashboard
 
 click.rich_click.USE_RICH_MARKUP = True
 click.rich_click.SHOW_ARGUMENTS = True
@@ -81,7 +81,7 @@ def main(
     ctx.obj = global_options
 
     if ctx.invoked_subcommand is None:
-        ctx.invoke(show)
+        ctx.invoke(dashboard)
 
 
-main.add_command(show)
+main.add_command(dashboard)

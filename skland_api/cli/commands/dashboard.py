@@ -8,7 +8,7 @@ from typing import Callable
 import rich_click as click
 from loguru import logger
 
-from skland_api import CharacterInfo, CharacterInfoLoader, SklandApiException, SklandAuthInfo
+from skland_api import AuthInfo, CharacterInfo, CharacterInfoLoader, SklandApiException
 
 from .common import GlobalOptions, async_command
 
@@ -21,7 +21,7 @@ class LoadedModule:
     is_async: bool
 
 
-@click.command()
+@click.command(name="dashboard")
 @click.option(
     "--modules",
     "modules_str",
@@ -30,7 +30,7 @@ class LoadedModule:
 )
 @click.pass_context
 @async_command
-async def show(
+async def dashboard(
     ctx: click.Context,
     modules_str: str | None = None,
 ) -> None:
@@ -44,7 +44,7 @@ async def show(
         # default modules
         modules = [
             "title",
-            "sign",
+            "checkin",
             "online",
             "stamina",
             "affair",
@@ -78,7 +78,7 @@ async def show(
             logger.error(f"name {name!r} not in auth file")
             return []
         try:
-            auth_info = SklandAuthInfo(**info)
+            auth_info = AuthInfo(**info)
             api = await auth_info.full_auth()
             info.update(auth_info.to_dict())
         except ValueError:
