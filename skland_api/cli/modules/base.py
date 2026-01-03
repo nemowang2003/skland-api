@@ -126,43 +126,6 @@ def main(character_info: CharacterInfo, config: dict | None):
                 formatter.write_green_bold("无", prefix=" ")
             formatter.write("\n")
 
-            formatter.write_yellow_bold("专精状态")
-            training = data["training"]
-            trainee = training["trainee"]
-            if trainee is None or trainee["targetSkill"] == -1:
-                formatter.writeline(": 无")
-            else:
-                with formatter.indent():
-                    name = character_info.operator_mapping[trainee["charId"]]
-                    skill_id = trainee["targetSkill"]
-                    formatter.write_yellow_bold("专精干员", suffix=": ")
-                    formatter.writeline(f"{name}({skill_id + 1}技能)")
-
-                    formatter.write_yellow_bold("协助干员", suffix=": ")
-                    trainer = training["trainer"]
-                    if trainer is None:
-                        formatter.write_red_bold("无", suffix="\n")
-                    else:
-                        name = character_info.operator_mapping[trainer["charId"]]
-                        formatter.writeline(name)
-
-                    percentage = int(
-                        (TOTAL_TRAIN_POINT - training["remainPoint"] + 1)
-                        * 100
-                        / TOTAL_TRAIN_POINT
-                    )
-                    remain_seconds = training["remainSecs"]
-                    formatter.write_yellow_bold("专精进度", suffix=": ")
-                    formatter.writeline(
-                        f"{percentage}% ({display_remain_seconds(remain_seconds)}完成)"
-                    )
-                    formatter.write_style(
-                        "TODO: 适配不同专精等级，根据当前时间计算进度",
-                        suffix="\n",
-                        fg="cyan",
-                        bold=True,
-                    )
-
             if config is None or (path := config.get(character_info.name)) is None:
                 return
             from pathlib import Path
