@@ -16,4 +16,4 @@
 
 ---
 
-如果您认为本项目存在引用不当之处，请通过 [github issue](https://github.com/Nemowang2003/skland-api/issues) 联系我们。
+如果您认为本项目存在引用不当之处，请通过 [github issue](https://github.com/nemowang2003/skland-api/issues) 联系我们。

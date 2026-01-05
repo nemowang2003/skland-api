@@ -4,7 +4,20 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-from skland_api import SklandApi, constants
+from skland_api.api import SklandApi
+
+from . import constants
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
+class OperatorInfo:
+    """
+    evolve: 精英化等级 {0, 1, 2}
+    master_levels: 专精等级 {0, 1, 2, 3}, 列表长度为技能数量
+    """
+
+    evolve: int
+    mastery_levels: list[int]
 
 
 # Cannot use frozen=True and slots=True because of cached_property
@@ -17,23 +30,37 @@ class CharacterInfo:
     player_info: dict
 
     @cached_property
-    def operator_mapping(self) -> dict:
-        return {
-            entry["id"]: entry["name"] for entry in self.player_info["charInfoMap"].values()
-        } | constants.OPERATOR_MAPPING_FIX
+    def operator_name_mapping(self) -> dict[str, str]:
+        """
+        char_id -> display_name
+        """
+        return {entry["id"]: entry["name"] for entry in self.player_info["charInfoMap"].values()}
 
     @cached_property
-    def operators(self) -> dict:
+    def operator_name_mapping_with_fix(self) -> dict[str, str]:
+        """
+        char_id -> display_name
+        """
+        return self.operator_name_mapping | constants.OPERATOR_NAME_MAPPING_FIX
+
+    @cached_property
+    def operators(self) -> dict[str, OperatorInfo]:
+        """
+        char_id -> OperatorInfo
+        """
         return {
-            self.operator_mapping[entry["id"]]: {
-                "evolve": entry["evolvePhase"],
-                "skills": [skill["level"] for skill in entry["skills"]],
-            }
+            entry["id"]: OperatorInfo(
+                evolve=entry["evolvePhase"],
+                mastery_levels=[skill["level"] for skill in entry["skills"]],
+            )
             for entry in self.cultivate["characters"]
         }
 
     @cached_property
-    def item_mapping(self) -> dict:
+    def depot(self) -> dict[str, int]:
+        """
+        display_name -> count
+        """
         return {
             constants.ITEM_MAPPING[entry["id"]]: entry["count"]
             for entry in self.cultivate["items"]

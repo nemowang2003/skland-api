@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Repository" = "https://github.com/Nemowang2003/skland-api"
+"Repository" = "https://github.com/nemowang2003/skland-api"
 
 [project.scripts]
 skland = "skland_api.cli:main"
@@ -26,18 +26,12 @@ cli = [
 [dependency-groups]
 dev = [
     "pre-commit>=4.5.0",
-    "ty>=0.0.5",
+    "ty>=0.0.8",
 ]
 
 [build-system]
 requires = ["uv_build>=0.7.8,<0.8.0"]
 build-backend = "uv_build"
-
-[tool.uv.build-backend]
-module-root = ""
-
-[tool.mypy]
-python_version = "3.14"
 
 [tool.ruff]
 target-version = "py314"

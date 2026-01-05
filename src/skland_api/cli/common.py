@@ -7,13 +7,14 @@ from pathlib import Path
 from typing import Self
 
 import rich_click as click
+from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from skland_api import AuthInfo
-from skland_api.cli.utils import console
+from skland_api.models import AuthInfo
 
 APPNAME = "skland-api"
+console = Console()
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -26,7 +27,7 @@ class GlobalOptions:
 
     def update_auth_file(self) -> None:
         with self.auth_file.open("w", encoding="utf-8") as fp:
-            json.dump(self.auth, fp, ensure_ascii=True, indent=2)
+            json.dump(self.auth, fp, ensure_ascii=False, indent=2)
 
     @classmethod
     def from_command_line_options(
@@ -76,6 +77,7 @@ class GlobalOptions:
 def create_auth_file(file: Path) -> None:
     if file.exists():
         raise FileExistsError(file)
+    file.touch(mode=0o600)
 
     while True:
         try:
@@ -114,7 +116,7 @@ def create_auth_file(file: Path) -> None:
                 json.dump(
                     {name: auth_info.to_dict()},
                     fp,
-                    ensure_ascii=True,
+                    ensure_ascii=False,
                     indent=2,
                 )
 
@@ -138,7 +140,7 @@ def create_config_file(file: Path):
             json.dump(
                 {"module-config": {}},
                 fp,
-                ensure_ascii=True,
+                ensure_ascii=False,
                 indent=2,
             )
         console.print(f"[bold green]Config file created at:[/]\n  {file}")

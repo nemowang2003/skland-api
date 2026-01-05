@@ -23,7 +23,7 @@ class SklandApiException(Exception):
 
 
 class SklandClientAuth(httpx.Auth):
-    def __init__(self, token: str | None):
+    def __init__(self, token: str | None = None):
         self.token = token
 
     def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response]:
@@ -36,7 +36,7 @@ class SklandClientAuth(httpx.Auth):
         if request.method == "GET":
             payload = request.url.query.decode("utf-8")
         else:
-            payload = request.content.decode("utf-8") if request.content else ""
+            payload = request.content.decode("utf-8")
 
         timestamp = str(int(time.time()))
         payload_to_sign = "".join(
@@ -68,9 +68,11 @@ class SklandClientAuth(httpx.Auth):
 
 
 class SklandClient:
+    client: httpx.AsyncClient
+
     def __init__(self) -> None:
-        self.client: httpx.AsyncClient = httpx.AsyncClient(
-            auth=SklandClientAuth(None),
+        self.client = httpx.AsyncClient(
+            auth=SklandClientAuth(),
             headers={
                 "User-Agent": "Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0",
                 "Accept-Encoding": "gzip",
@@ -94,9 +96,7 @@ class SklandClient:
 
     @property
     def token(self) -> Never:
-        raise AttributeError(
-            f"cannot read attribute 'token' from {self.__class__.__name__!r} (I think it doesn't make sense)"
-        )
+        raise AttributeError(f"cannot read attribute 'token' from {self.__class__.__name__!r}")
 
     @token.setter
     def token(self, token: str):

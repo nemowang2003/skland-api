@@ -1,4 +1,4 @@
-OPERATOR_MAPPING_FIX = {
+OPERATOR_NAME_MAPPING_FIX = {
     "char_1001_amiya2": "阿米娅(近卫)",
     "char_1037_amiya3": "阿米娅(医疗)",
 }

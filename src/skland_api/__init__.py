@@ -1,5 +1,6 @@
 from .api import SklandApi, SklandApiException
-from .models import AuthInfo, CharacterInfo, CharacterInfoLoader
+from .models.auth import AuthInfo
+from .models.character import CharacterInfo, CharacterInfoLoader
 
 __all__ = [
     "AuthInfo",

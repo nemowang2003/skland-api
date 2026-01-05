@@ -1,7 +1,18 @@
 from pathlib import Path
 
-import platformdirs
-import rich_click as click
+try:
+    import platformdirs
+    import rich_click as click
+except ImportError:
+    import sys
+
+    print(
+        "错误: 运行命令行界面 (CLI) 需要安装额外的依赖。\n"
+        "请运行以下命令进行安装: pip install 'skland-api[cli]'",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 from loguru import logger
 
 from .common import APPNAME, GlobalOptions
@@ -74,3 +85,7 @@ def main(
 
 
 main.add_command(dashboard)
+
+__all__ = [
+    "main",
+]
