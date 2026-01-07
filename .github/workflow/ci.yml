@@ -1,0 +1,14 @@
+name: ci checks
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --all-extras
+      - run: uv run pre-commit --all-files
