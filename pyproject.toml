@@ -1,26 +1,50 @@
 [project]
 name = "skland-api"
-version = "0.1.2"
-description = "Add your description here"
+version = "0.2.0"
+description = "An unofficial Python API client and CLI dashboard for Skland (Arknights), featuring a decoupled data-rendering architecture."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
-    "requests>=2.32.5",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
 ]
 
+[project.urls]
+"Repository" = "https://github.com/nemowang2003/skland-api"
+
 [project.scripts]
-skland = "skland_api.cli.main:main"
+skland = "skland_api.cli:main"
 
 [project.optional-dependencies]
 cli = [
-    "click>=8.3.1",
     "platformdirs>=4.3.8",
+    "rich>=14.2.0",
+    "rich-click>=1.9.4",
     "wcwidth>=0.2.13",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.0",
+    "ty>=0.0.8",
 ]
 
 [build-system]
 requires = ["uv_build>=0.7.8,<0.8.0"]
 build-backend = "uv_build"
 
-[tool.uv.build-backend]
-module-root = ""
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+extend-ignore = ["E501"]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+]
+
+[tool.ruff.lint.isort]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
