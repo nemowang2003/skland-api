@@ -47,5 +47,4 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["skland_api"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]

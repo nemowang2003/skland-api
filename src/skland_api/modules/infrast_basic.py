@@ -32,7 +32,7 @@ def get_mastery(character_info: CharacterInfo) -> Mastery | None:
     skill_mastery_level = character_info.operators[trainee["charId"]].mastery_levels[skill_id]
 
     trainer = mastery_data["trainer"]
-    trainer_name = trainer or character_info.operator_name_mapping_with_fix[trainer["charId"]]
+    trainer_name = trainer or character_info.operator_name_mapping[trainer["charId"]]
 
     speed = mastery_data["speed"]
     total = TOTAL_TRAIN_POINT[skill_mastery_level]
@@ -56,13 +56,12 @@ def get_mastery(character_info: CharacterInfo) -> Mastery | None:
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
-class InfrastModel:
+class InfrastOverview:
     """
     drones: 预计无人机数量
     dronse_full_in: 预计无人机补满时间
     exhausted_operators: 疲劳干员列表
     mastery: 专精状态
-    stationing_audit: 排班表检查结果
     """
 
     drones: Capacity
@@ -71,7 +70,7 @@ class InfrastModel:
     mastery: Mastery | None
 
 
-def main(character_info: CharacterInfo, config: dict | None):
+def main(character_info: CharacterInfo, config: dict | None) -> InfrastOverview:
     data = character_info.player_info["building"]
     update_time = character_info.player_info["status"]["storeTs"]
 
@@ -93,10 +92,10 @@ def main(character_info: CharacterInfo, config: dict | None):
     drones = Capacity(current, total)
     drones_full_in = Duration(remain_seconds)
     exhausted_operators = [
-        character_info.operator_name_mapping_with_fix[char["charId"]] for char in data["tiredChars"]
+        character_info.operator_name_mapping[char["charId"]] for char in data["tiredChars"]
     ]
     mastery = get_mastery(character_info)
-    return InfrastModel(
+    return InfrastOverview(
         drones=drones,
         drones_full_in=drones_full_in,
         exhausted_operators=exhausted_operators,

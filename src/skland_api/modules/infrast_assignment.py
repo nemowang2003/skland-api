@@ -178,10 +178,10 @@ class InfrastAudit:
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class FiammettaMonitor:
-    related_characters: list[StationedOperatorInfo]
+    related_operators: list[StationedOperatorInfo]
+    missing_operators: set[str]
     fiammetta: StationedOperatorInfo | None
     fiammetta_recover_at: TimeStamp | None
-    missing_operators: set[str]
 
     @classmethod
     def new(
@@ -203,11 +203,14 @@ class FiammettaMonitor:
             fiammetta_recover_at = TimeStamp(
                 update_time + int((FULL_MORALE - fiammetta.morale) / FIAMMETTA_RECOVER_PER_SECOND)
             )
+        else:
+            fiammetta_releated.add("菲亚梅塔")
+
         return cls(
-            related_characters=present,
+            related_operators=present,
+            missing_operators=fiammetta_releated,
             fiammetta=fiammetta,
             fiammetta_recover_at=fiammetta_recover_at,
-            missing_operators=fiammetta_releated,
         )
 
 

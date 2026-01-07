@@ -1,9 +1,10 @@
 import asyncio
+import functools
 import importlib
-import inspect
-import itertools
 import typing
+from collections.abc import Coroutine
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Callable
 
 import rich_click as click
@@ -12,109 +13,94 @@ from loguru import logger
 from skland_api.api import SklandApiException
 from skland_api.models import AuthInfo, CharacterInfo, CharacterInfoLoader
 
-from ..common import GlobalOptions, async_command
+from ..common import GlobalOptions, async_command, console
+from .formatter import render
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class LoadedModule:
-    name: str
     entry: Callable
-    config: dict
     is_async: bool
 
 
-@click.command(name="dashboard")
-@click.option(
-    "--names",
-    "names_str",
-    metavar="name1,name2,...",
-    help="要查询的账号名称列表，使用逗号分割",
-)
-@click.option(
-    "--modules",
-    "modules_str",
-    metavar="module1,module2,...",
-    help="要运行的功能模块列表，使用逗号分隔",
-)
-@click.pass_context
-@async_command
-async def dashboard(
-    ctx: click.Context,
-    names_str: str | None = None,
-    modules_str: str | None = None,
-) -> None:
-    """展示明日方舟游戏数据看板。
+@dataclass(kw_only=True, slots=True)
+class ModuleTask:
+    user_name: str
+    module_name: str
+    entry: Callable
 
-    该命令会遍历配置中的所有账号，获取其绑定的角色信息，并依次执行指定的功能模块。支持的模块包括:
 
-    默认模块:
+class DashBoardLauncher:
+    DEFAULT_MODULES = [
+        "profile",
+        "update",
+        "checkin",
+        "online",
+        "sanity",
+        "routine",
+        "mission",
+        "recruit",
+        "infrast_basic",
+    ]
+    global_options: GlobalOptions
+    names_str: str | None
+    modules_str: str | None
 
-    - profile       : 玩家个人信息
-    - update        : 数据更新时间
-    - checkin       : 每日签到
-    - online        : 上次在线时间
-    - sanity        : 当前理智
-    - routine       : 剿灭/保全派驻进度
-    - mission       : 每日/每周任务进度
-    - recruit       : 公开招募进度
-    - infrast_basic : 基建概览
+    all_module_task: list[list[ModuleTask]]
+    async_tasks: list[ModuleTask]
+    coroutines: list[Coroutine]
 
-    如果没有指定 --modules, 将按上述顺序运行所有默认模块。
+    def __init__(
+        self, global_options: GlobalOptions, names_str: str | None, modules_str: str | None
+    ) -> None:
+        self.global_options = global_options
+        self.names_str = names_str
+        self.modules_str = modules_str
 
-    其它模块:
+        self.all_module_task = []
+        self.async_tasks = []
+        self.coroutines = []
 
-    - infrast_assignment : 基建排班表审计与菲亚梅塔监控, 需要提供 MAA 换班表
-    """
-    global_options = typing.cast(GlobalOptions, ctx.obj)
+    @cached_property
+    def names(self) -> list[str]:
+        if self.names_str is not None:
+            names = self.names_str.split(",")
+            unique_names = list(dict.fromkeys(names))
+            if names != unique_names:
+                logger.warning("Duplicate names found, duplicates will be ignored.")
+            return unique_names
+        return list(self.global_options.auth.keys())
 
-    if names_str is not None:
-        names = names_str.split(",")
-    else:
-        names = list(global_options.auth.keys())
+    @cached_property
+    def modules(self) -> list[str]:
+        if self.modules_str is not None:
+            modules = self.modules_str.split(",")
+            unique_modules = list(dict.fromkeys(modules))
+            if modules != unique_modules:
+                logger.warning("Duplicate modules found, duplicates will be ignored.")
+            return unique_modules
+        return self.DEFAULT_MODULES
 
-    unique_names = list(dict.fromkeys(names))
-    if names != unique_names:
-        logger.warning("Duplicate names found, duplicates will be ignored.")
-        names = unique_names
+    @cached_property
+    def module_registry(self) -> dict[str, LoadedModule]:
+        registry = {}
 
-    if modules_str is not None:
-        modules = modules_str.split(",")
-    else:
-        # default modules
-        modules = [
-            "profile",
-            "update",
-            "checkin",
-            "online",
-            "sanity",
-            "routine",
-            "mission",
-            "recruit",
-            "infrast_basic",
-        ]
-
-    unique_modules = list(dict.fromkeys(modules))
-    if modules != unique_modules:
-        logger.warning("Duplicate modules found, duplicates will be ignored.")
-        modules = unique_modules
-
-    loaded_modules: list[LoadedModule] = []
-    for module_name in modules:
-        try:
-            entry = importlib.import_module(f"skland_api.modules.{module_name}").main
-            loaded_modules.append(
-                LoadedModule(
-                    name=module_name,
+        for module_name in self.modules:
+            try:
+                entry = importlib.import_module(
+                    f".formatter.{module_name}", __package__
+                ).module_entry
+                registry[module_name] = LoadedModule(
                     entry=entry,
-                    config=global_options.config["module-config"].get(module_name),
-                    is_async=inspect.iscoroutinefunction(entry),
+                    is_async=asyncio.iscoroutinefunction(entry),
                 )
-            )
-        except ImportError:
-            logger.error(f"{module_name!r} is not a valid module")
+            except ImportError:
+                logger.error(f"{module_name!r} is not a valid module")
 
-    async def fetch_character_info(name: str) -> list[CharacterInfo]:
-        if (info := global_options.auth.get(name)) is None:
+        return registry
+
+    async def fetch_character_info(self, name: str) -> list[CharacterInfo]:
+        if (info := self.global_options.auth.get(name)) is None:
             logger.error(f"name {name!r} not in auth file")
             return []
         try:
@@ -143,26 +129,87 @@ async def dashboard(
             if isinstance(result, BaseException):
                 logger.error(f"Failed to load character info: {result}")
             else:
-                result.dump_to(global_options.cache_dir)
+                result.dump_to(self.global_options.cache_dir)
                 char_infos.append(result)
 
         return char_infos
 
-    all_character_info = await asyncio.gather(*[fetch_character_info(name) for name in names])
+    def build_all_module_tasks(self, all_character_info: list[list[CharacterInfo]]) -> None:
+        for name, character_infos in zip(self.names, all_character_info):
+            module_tasks: list[ModuleTask] = []
+            for character_info in character_infos:
+                for module_name in self.modules:
+                    module = self.module_registry[module_name]
+                    module_task = ModuleTask(
+                        user_name=name,
+                        module_name=module_name,
+                        entry=functools.partial(
+                            module.entry,
+                            character_info,
+                            self.global_options.config["module-config"].get(module_name),
+                        ),
+                    )
+                    module_tasks.append(module_task)
+                    if module.is_async:
+                        self.async_tasks.append(module_task)
+                        self.coroutines.append(module_task.entry())
 
-    global_options.update_auth_file()
+            self.all_module_task.append(module_tasks)
 
-    for character_info in itertools.chain.from_iterable(all_character_info):
-        for module in loaded_modules:
-            try:
-                if module.is_async:
-                    await module.entry(character_info, module.config)
-                else:
-                    module.entry(character_info, module.config)
-            except Exception:
-                logger.exception(
-                    f"Module {module.name!r} execution failed for {character_info.name!r}"
+    async def run_async_tasks_and_patch_module_tasks(self) -> None:
+        for task, result in zip(
+            self.async_tasks,
+            await asyncio.gather(*self.coroutines, return_exceptions=True),
+        ):
+            task = typing.cast(ModuleTask, task)
+            if isinstance(result, BaseException):
+                logger.error(
+                    f"Module {task.module_name!r} for {task.user_name!r} execution failed: {result}"
                 )
+                task.entry = dummy_func
+            else:
+                task.entry = functools.partial(identity_func, result)
+
+
+@click.command(name="dashboard")
+@click.option(
+    "--names",
+    "names_str",
+    metavar="name1,name2,...",
+    help="要查询的账号名称列表，使用逗号分割",
+)
+@click.option(
+    "--modules",
+    "modules_str",
+    metavar="module1,module2,...",
+    help="要运行的功能模块列表，使用逗号分隔",
+)
+@click.pass_context
+@async_command
+async def dashboard(
+    ctx: click.Context, names_str: str | None = None, modules_str: str | None = None
+) -> None:
+    launcher = DashBoardLauncher(ctx.obj, names_str, modules_str)
+
+    all_character_info = await asyncio.gather(
+        *[launcher.fetch_character_info(name) for name in launcher.names]
+    )
+    launcher.global_options.update_auth_file()
+    launcher.build_all_module_tasks(all_character_info)
+    await launcher.run_async_tasks_and_patch_module_tasks()
+
+    for tasks in launcher.all_module_task:
+        for task in tasks:
+            if (result := task.entry()) is not None:
+                console.print(render(result))
+
+
+def dummy_func() -> None:
+    return None
+
+
+def identity_func(x):
+    return x
 
 
 __all__ = [
