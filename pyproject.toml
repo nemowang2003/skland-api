@@ -1,7 +1,7 @@
 [project]
 name = "skland-api"
-version = "0.1.2"
-description = "An unofficial Python API client and CLI for Skland. Features automated Arknights check-ins and comprehensive data tracking."
+version = "0.2.0"
+description = "An unofficial Python API client and CLI dashboard for Skland (Arknights), featuring a decoupled data-rendering architecture."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
