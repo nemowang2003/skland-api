@@ -163,12 +163,9 @@ class DashBoardLauncher:
         ):
             task = typing.cast(ModuleTask, task)
             if isinstance(result, BaseException):
-                logger.error(
-                    f"Module {task.module_name!r} for {task.user_name!r} execution failed: {result}"
-                )
-                task.entry = dummy_func
+                task.entry = functools.partial(raise_result, result)
             else:
-                task.entry = functools.partial(identity_func, result)
+                task.entry = functools.partial(return_result, result)
 
 
 @click.command(name="dashboard")
@@ -200,16 +197,18 @@ async def dashboard(
 
     for tasks in launcher.all_module_task:
         for task in tasks:
-            if (result := task.entry()) is not None:
-                console.print(render(result))
+            try:
+                console.print(render(task.entry()))
+            except BaseException as e:
+                logger.error(f"Module {task.module_name!r} for user {task.user_name!r} failed: {e}")
 
 
-def dummy_func() -> None:
-    return None
+def raise_result(result: BaseException):
+    raise result
 
 
-def identity_func(x):
-    return x
+def return_result(result):
+    return result
 
 
 __all__ = [
