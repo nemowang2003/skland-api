@@ -22,7 +22,7 @@ def render_infrast_overview(infrast_overview: InfrastOverview) -> Panel:
     text.append("预计无人机数量", style="yellow bold")
     text.append(": ")
     text.append_text(render_capacity(infrast_overview.drones))
-    text.append(" (预计")
+    text.append(" (")
     text.append_text(render_duration(infrast_overview.drones_full_in))
     text.append("补满)")
 
@@ -34,7 +34,7 @@ def render_infrast_overview(infrast_overview: InfrastOverview) -> Panel:
         text.append(": ")
         text.append(mastery.trainee_name, style="green bold")
         skill_id = mastery.skill_id + 1
-        level = mastery.skill_mastery_level + 1
+        level = mastery.skill_mastery_level
         text.append(f"({skill_id}技能, 专精等级{level}->{level + 1})\n")
 
         if mastery.trainer_name is not None:
