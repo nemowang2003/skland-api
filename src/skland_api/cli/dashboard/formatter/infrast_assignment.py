@@ -13,9 +13,17 @@ from . import render, render_timestamp
 
 MORALE_REDLINE = 8
 
+FACILITY_COLOR: dict = {
+    "发电站": "green bold",
+    "贸易站": "blue bold",
+    "制造站": "yellow bold",
+}
 
-def render_facility_audit(facility_audit: FacilityAudit) -> Text:
+
+def render_facility_audit(facility_name: str, facility_audit: FacilityAudit) -> Text:
     text = Text()
+    text.append(facility_name, style=FACILITY_COLOR.get(facility_name, "bold"))
+    text.append(":")
     for operator_name in facility_audit.missing:
         text.append(" ")
         text.append(operator_name, style="s red bold")
@@ -45,37 +53,9 @@ def render_infrast_assignment(infrast_assignment: InfrastAssignmentReport) -> Gr
     if audit is not None:
         text = Text()
 
-        text.append("控制中枢", style="bold")
-        text.append(":")
-        text.append(render_facility_audit(audit.control))
+        for facility_name, facility_audit in audit.iter_facilities():
+            text.append_text(render_facility_audit(facility_name, facility_audit))
 
-        for facility in audit.powers:
-            text.append("发电站", style="green bold")
-            text.append(":")
-            text.append(render_facility_audit(facility))
-
-        for facility in audit.tradings:
-            text.append("贸易站", style="blue bold")
-            text.append(":")
-            text.append(render_facility_audit(facility))
-
-        for facility in audit.manufactures:
-            text.append("制造站", style="yellow bold")
-            text.append(":")
-            text.append(render_facility_audit(facility))
-
-        text.append("办公室", style="bold")
-        text.append(":")
-        text.append(render_facility_audit(audit.hire))
-
-        text.append("会客室", style="bold")
-        text.append(":")
-        text.append(render_facility_audit(audit.meeting))
-
-        for facility in audit.dormitories:
-            text.append("宿舍", style="bold")
-            text.append(":")
-            text.append(render_facility_audit(facility))
         text.remove_suffix("\n")
 
         panel = Panel(text, title="排班表检查")
@@ -90,7 +70,7 @@ def render_infrast_assignment(infrast_assignment: InfrastAssignmentReport) -> Gr
             text.append("\n")
 
         if monitor.fiammetta is not None and monitor.fiammetta_recover_at is not None:
-            text.append(render_stationed_operator(monitor.fiammetta))
+            text.append_text(render_stationed_operator(monitor.fiammetta))
             text.append(" (预计")
             text.append_text(render_timestamp(monitor.fiammetta_recover_at))
             text.append("回满)\n")
