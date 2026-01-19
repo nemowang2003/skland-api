@@ -13,18 +13,18 @@ def render(data) -> RenderableType:
 
 def render_capacity(capacity: Capacity) -> Text:
     if capacity.current >= capacity.total:
-        style = "bold red"
+        color = "red"
     else:
-        style = "bold green"
-    return Text(f"{capacity.current}/{capacity.total}", style=style)
+        color = "green"
+    return Text(f"{capacity.current}/{capacity.total}", style=f"bold {color}")
 
 
 def render_progress(progress: Progress) -> Text:
     if progress.current < progress.total:
-        style = "bold red"
+        color = "red"
     else:
-        style = "bold green"
-    return Text(f"{progress.current}/{progress.total}", style=style)
+        color = "green"
+    return Text(f"{progress.current}/{progress.total}", style=f"bold {color}")
 
 
 def render_duration(duration: Duration) -> Text:

@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import importlib
+import json
 import typing
 from collections.abc import Coroutine
 from dataclasses import dataclass
@@ -11,9 +12,9 @@ import rich_click as click
 from loguru import logger
 
 from skland_api.api import SklandApiException
+from skland_api.cli.core import GlobalOption, console, skland_command
 from skland_api.models import AuthInfo, CharacterInfo, CharacterInfoLoader
 
-from ..common import GlobalOptions, async_command, console
 from .formatter import render
 
 
@@ -42,18 +43,14 @@ class DashBoardLauncher:
         "recruit",
         "infrast_basic",
     ]
-    global_options: GlobalOptions
-    names_str: str | None
-    modules_str: str | None
-
     all_module_task: list[list[ModuleTask]]
     async_tasks: list[ModuleTask]
     coroutines: list[Coroutine]
 
     def __init__(
-        self, global_options: GlobalOptions, names_str: str | None, modules_str: str | None
+        self, global_option: GlobalOption, names_str: str | None, modules_str: str | None
     ) -> None:
-        self.global_options = global_options
+        self.global_option = global_option
         self.names_str = names_str
         self.modules_str = modules_str
 
@@ -69,7 +66,7 @@ class DashBoardLauncher:
             if names != unique_names:
                 logger.warning("Duplicate names found, duplicates will be ignored.")
             return unique_names
-        return list(self.global_options.auth.keys())
+        return list(self.global_option.auth.keys())
 
     @cached_property
     def modules(self) -> list[str]:
@@ -100,7 +97,7 @@ class DashBoardLauncher:
         return registry
 
     async def fetch_character_info(self, name: str) -> list[CharacterInfo]:
-        if (info := self.global_options.auth.get(name)) is None:
+        if (info := self.global_option.auth.get(name)) is None:
             logger.error(f"name {name!r} not in auth file")
             return []
         try:
@@ -129,7 +126,7 @@ class DashBoardLauncher:
             if isinstance(result, BaseException):
                 logger.error(f"Failed to load character info: {result}")
             else:
-                result.dump_to(self.global_options.cache_dir)
+                result.dump_to(self.global_option.cache_dir)
                 char_infos.append(result)
 
         return char_infos
@@ -146,7 +143,7 @@ class DashBoardLauncher:
                         entry=functools.partial(
                             module.entry,
                             character_info,
-                            self.global_options.config["module-config"].get(module_name),
+                            self.global_option.config["module-config"].get(module_name),
                         ),
                     )
                     module_tasks.append(module_task)
@@ -162,16 +159,10 @@ class DashBoardLauncher:
             await asyncio.gather(*self.coroutines, return_exceptions=True),
         ):
             task = typing.cast(ModuleTask, task)
-            if isinstance(result, BaseException):
-                logger.error(
-                    f"Module {task.module_name!r} for {task.user_name!r} execution failed: {result}"
-                )
-                task.entry = dummy_func
-            else:
-                task.entry = functools.partial(identity_func, result)
+            task.entry = functools.partial(return_result, result)
 
 
-@click.command(name="dashboard")
+@skland_command(name="dashboard")
 @click.option(
     "--names",
     "names_str",
@@ -184,32 +175,32 @@ class DashBoardLauncher:
     metavar="module1,module2,...",
     help="要运行的功能模块列表，使用逗号分隔",
 )
-@click.pass_context
-@async_command
 async def dashboard(
-    ctx: click.Context, names_str: str | None = None, modules_str: str | None = None
+    global_option: GlobalOption, names_str: str | None = None, modules_str: str | None = None
 ) -> None:
-    launcher = DashBoardLauncher(ctx.obj, names_str, modules_str)
+    launcher = DashBoardLauncher(global_option, names_str, modules_str)
 
     all_character_info = await asyncio.gather(
         *[launcher.fetch_character_info(name) for name in launcher.names]
     )
-    launcher.global_options.update_auth_file()
+    with global_option.auth_file.open("w") as fp:
+        json.dump(global_option.auth, fp, ensure_ascii=True, indent=2)
     launcher.build_all_module_tasks(all_character_info)
     await launcher.run_async_tasks_and_patch_module_tasks()
 
     for tasks in launcher.all_module_task:
         for task in tasks:
-            if (result := task.entry()) is not None:
+            result = task.entry()
+            if isinstance(result, BaseException):
+                logger.error(
+                    f"Module {task.module_name!r} for user {task.user_name!r} failed: {result}"
+                )
+            else:
                 console.print(render(result))
 
 
-def dummy_func() -> None:
-    return None
-
-
-def identity_func(x):
-    return x
+def return_result(result):
+    return result
 
 
 __all__ = [

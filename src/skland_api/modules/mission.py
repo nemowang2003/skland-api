@@ -14,9 +14,9 @@ def main(character_info: CharacterInfo, config: dict | None) -> MissionStatus:
     daily_data = data["daily"]
     daily = Progress(daily_data["current"], daily_data["total"])
     weekly_data = data["weekly"]
-    weekily = Progress(weekly_data["current"], weekly_data["total"])
+    weekly = Progress(weekly_data["current"], weekly_data["total"])
 
     return MissionStatus(
         daily=daily,
-        weekly=weekily,
+        weekly=weekly,
     )

@@ -1,6 +1,7 @@
 from collections import UserList
 from collections.abc import Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 from itertools import permutations
 from typing import Self
 
@@ -28,115 +29,68 @@ class StationedOperatorInfo:
 
 class FacilityPresence(UserList[StationedOperatorInfo]):
     @classmethod
-    def from_skland_data(cls, data: dict, name_mapping: dict[str, str]) -> Self:
+    def from_single_skland_data(cls, data: dict, name_mapping: dict[str, str]) -> Self:
         return cls(
             [StationedOperatorInfo.from_skland_data(char, name_mapping) for char in data["chars"]]
         )
 
+    @classmethod
+    def from_multiple_skland_data(cls, data: dict, name_mapping: dict[str, str]) -> list[Self]:
+        return [cls.from_single_skland_data(segment, name_mapping) for segment in data]
+
+
+class FacilityEnum(StrEnum):
+    CONTROL = "控制中枢"
+    POWER = "发电站"
+    TRADING = "贸易站"
+    MANUFACTURE = "制造站"
+    HIRE = "办公室"
+    MEETING = "会客室"
+    DORMITORIE = "宿舍"
+
 
 @dataclass(frozen=True, kw_only=True, slots=True)
-class InfrastPresence:
-    control: FacilityPresence
-    powers: list[FacilityPresence]
-    tradings: list[FacilityPresence]
-    manufactures: list[FacilityPresence]
-    hire: FacilityPresence
-    meeting: FacilityPresence
-    dormitories: list[FacilityPresence]
+class InfrastBase[T]:
+    control: T
+    powers: list[T]
+    tradings: list[T]
+    manufactures: list[T]
+    hire: T
+    meeting: T
+    dormitories: list[T]
 
-    def __iter__(self) -> Iterator[StationedOperatorInfo]:
-        yield from self.control
+    def iter_facilities(self) -> Iterator[tuple[FacilityEnum, T]]:
+        yield FacilityEnum.CONTROL, self.control
         for power in self.powers:
-            yield from power
+            yield FacilityEnum.POWER, power
         for trading in self.tradings:
-            yield from trading
+            yield FacilityEnum.TRADING, trading
         for manufacture in self.manufactures:
-            yield from manufacture
-        yield from self.hire
-        yield from self.meeting
+            yield FacilityEnum.MANUFACTURE, manufacture
+        yield FacilityEnum.HIRE, self.hire
+        yield FacilityEnum.MEETING, self.meeting
         for dormitory in self.dormitories:
-            yield from dormitory
+            yield FacilityEnum.DORMITORIE, dormitory
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
+class InfrastPresence(InfrastBase[FacilityPresence]):
+    def __iter__(self) -> Iterator[StationedOperatorInfo]:
+        for _, facility_presence in self.iter_facilities():
+            yield from facility_presence
 
     @classmethod
     def from_character_info(cls, character_info: CharacterInfo) -> Self:
         data = character_info.player_info["building"]
+        mapping = character_info.operator_name_mapping
         return cls(
-            control=FacilityPresence.from_skland_data(
-                data["control"], character_info.operator_name_mapping
-            ),
-            powers=[
-                FacilityPresence.from_skland_data(power, character_info.operator_name_mapping)
-                for power in data["powers"]
-            ],
-            tradings=[
-                FacilityPresence.from_skland_data(trading, character_info.operator_name_mapping)
-                for trading in data["tradings"]
-            ],
-            manufactures=[
-                FacilityPresence.from_skland_data(manufacture, character_info.operator_name_mapping)
-                for manufacture in data["manufactures"]
-            ],
-            hire=FacilityPresence.from_skland_data(
-                data["hire"], character_info.operator_name_mapping
-            ),
-            meeting=FacilityPresence.from_skland_data(
-                data["meeting"], character_info.operator_name_mapping
-            ),
-            dormitories=[
-                FacilityPresence.from_skland_data(dormitory, character_info.operator_name_mapping)
-                for dormitory in data["dormitories"]
-            ],
-        )
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class FacilityAudit:
-    missing: list[str]
-    present: list[StationedOperatorInfo]
-    unexpected: list[StationedOperatorInfo]
-
-    @classmethod
-    def from_facility(cls, roster: FacilityRoster, presence: FacilityPresence) -> Self:
-        expected = set(roster)
-        actual = set(operator.name for operator in presence)
-        # 保留在 roster 和 presence 中的顺序
-        return cls(
-            missing=[operator for operator in roster if operator not in actual],
-            present=[operator for operator in presence if operator.name in expected],
-            unexpected=[operator for operator in presence if operator.name not in expected],
-        )
-
-
-class FacilityRoster(UserList[str]):
-    @classmethod
-    def from_maa_roster(cls, config: dict) -> Self:
-        return cls(config["operators"])
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class InfrastRoster:
-    control: FacilityRoster
-    powers: list[FacilityRoster]
-    tradings: list[FacilityRoster]
-    manufactures: list[FacilityRoster]
-    hire: FacilityRoster
-    meeting: FacilityRoster
-    dormitories: list[FacilityRoster]
-
-    @classmethod
-    def from_maa_roster(cls, config: dict) -> Self:
-        return cls(
-            control=FacilityRoster.from_maa_roster(config["control"][0]),
-            powers=[FacilityRoster.from_maa_roster(power) for power in config["power"]],
-            tradings=[FacilityRoster.from_maa_roster(trading) for trading in config["trading"]],
-            manufactures=[
-                FacilityRoster.from_maa_roster(manufacture) for manufacture in config["manufacture"]
-            ],
-            hire=FacilityRoster.from_maa_roster(config["hire"][0]),
-            meeting=FacilityRoster.from_maa_roster(config["meeting"][0]),
-            dormitories=[
-                FacilityRoster.from_maa_roster(dormitory) for dormitory in config["dormitory"]
-            ],
+            control=FacilityPresence.from_single_skland_data(data["control"], mapping),
+            powers=FacilityPresence.from_multiple_skland_data(data["powers"], mapping),
+            tradings=FacilityPresence.from_multiple_skland_data(data["tradings"], mapping),
+            manufactures=FacilityPresence.from_multiple_skland_data(data["manufactures"], mapping),
+            hire=FacilityPresence.from_single_skland_data(data["hire"], mapping),
+            meeting=FacilityPresence.from_single_skland_data(data["meeting"], mapping),
+            dormitories=FacilityPresence.from_multiple_skland_data(data["dormitories"], mapping),
         )
 
 
@@ -175,45 +129,81 @@ def align_facilities(
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
-class InfrastAudit:
-    control: FacilityAudit
-    powers: list[FacilityAudit]
-    tradings: list[FacilityAudit]
-    manufactures: list[FacilityAudit]
-    hire: FacilityAudit
-    meeting: FacilityAudit
-    dormitories: list[FacilityAudit]
+class FacilityAudit:
+    missing: list[str]
+    present: list[StationedOperatorInfo]
+    unexpected: list[StationedOperatorInfo]
 
+    @classmethod
+    def from_single_facility(cls, roster: FacilityRoster, presence: FacilityPresence) -> Self:
+        expected = set(roster)
+        actual = set(operator.name for operator in presence)
+        # 保留在 roster 和 presence 中的顺序
+        return cls(
+            missing=[operator for operator in roster if operator not in actual],
+            present=[operator for operator in presence if operator.name in expected],
+            unexpected=[operator for operator in presence if operator.name not in expected],
+        )
+
+    @classmethod
+    def from_multiple_facilities(
+        cls, rosters: list[FacilityRoster], presences: list[FacilityPresence]
+    ) -> list[Self]:
+        return [
+            cls.from_single_facility(roster, presence)
+            for roster, presence in align_facilities(rosters, presences)
+        ]
+
+
+class FacilityRoster(UserList[str]):
+    @classmethod
+    def from_single_maa_roster(cls, data: dict) -> Self:
+        return cls(data["operators"])
+
+    @classmethod
+    def from_multiple_maa_roster(cls, data: dict) -> list[Self]:
+        return [cls.from_single_maa_roster(segment) for segment in data]
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
+class InfrastRoster(InfrastBase[FacilityRoster]):
+    @classmethod
+    def from_maa_roster(cls, config: dict) -> Self:
+        return cls(
+            control=FacilityRoster.from_single_maa_roster(config["control"][0]),
+            powers=FacilityRoster.from_multiple_maa_roster(config["power"]),
+            tradings=FacilityRoster.from_multiple_maa_roster(config["trading"]),
+            manufactures=FacilityRoster.from_multiple_maa_roster(config["manufacture"]),
+            hire=FacilityRoster.from_single_maa_roster(config["hire"][0]),
+            meeting=FacilityRoster.from_single_maa_roster(config["meeting"][0]),
+            dormitories=FacilityRoster.from_multiple_maa_roster(config["dormitory"]),
+        )
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
+class InfrastAudit(InfrastBase[FacilityAudit]):
     @classmethod
     def new(cls, infrast_presence: InfrastPresence, active_roster: InfrastRoster) -> Self:
         return cls(
-            control=FacilityAudit.from_facility(active_roster.control, infrast_presence.control),
-            powers=[
-                FacilityAudit.from_facility(roster, presence)
-                for roster, presence in align_facilities(
-                    active_roster.powers, infrast_presence.powers
-                )
-            ],
-            tradings=[
-                FacilityAudit.from_facility(roster, presence)
-                for roster, presence in align_facilities(
-                    active_roster.tradings, infrast_presence.tradings
-                )
-            ],
-            manufactures=[
-                FacilityAudit.from_facility(roster, presence)
-                for roster, presence in align_facilities(
-                    active_roster.manufactures, infrast_presence.manufactures
-                )
-            ],
-            hire=FacilityAudit.from_facility(active_roster.hire, infrast_presence.hire),
-            meeting=FacilityAudit.from_facility(active_roster.meeting, infrast_presence.meeting),
-            dormitories=[
-                FacilityAudit.from_facility(roster, presence)
-                for roster, presence in align_facilities(
-                    active_roster.dormitories, infrast_presence.dormitories
-                )
-            ],
+            control=FacilityAudit.from_single_facility(
+                active_roster.control, infrast_presence.control
+            ),
+            powers=FacilityAudit.from_multiple_facilities(
+                active_roster.powers, infrast_presence.powers
+            ),
+            tradings=FacilityAudit.from_multiple_facilities(
+                active_roster.tradings, infrast_presence.tradings
+            ),
+            manufactures=FacilityAudit.from_multiple_facilities(
+                active_roster.manufactures, infrast_presence.manufactures
+            ),
+            hire=FacilityAudit.from_single_facility(active_roster.hire, infrast_presence.hire),
+            meeting=FacilityAudit.from_single_facility(
+                active_roster.meeting, infrast_presence.meeting
+            ),
+            dormitories=FacilityAudit.from_multiple_facilities(
+                active_roster.dormitories, infrast_presence.dormitories
+            ),
         )
 
 
@@ -270,7 +260,7 @@ def main(character_info: CharacterInfo, config: dict | None) -> InfrastAssignmen
 
     file = Path(path)
     if not file.exists():
-        logger.warning(f"invalid path {path!r} for {character_info.name!r}")
+        logger.warning(f"{character_info.name!r} 的排班表路径 {path!r} 不存在")
         return InfrastAssignmentReport()
 
     import json
@@ -294,10 +284,10 @@ def main(character_info: CharacterInfo, config: dict | None) -> InfrastAssignmen
     infrast_presence = InfrastPresence.from_character_info(character_info)
 
     if len(active_rosters) == 0:
-        logger.warning(f"no active roster for {character_info.name!r}")
+        logger.warning(f"{character_info.name!r} 没有适用于此时的排班计划")
         audit = None
     elif len(active_rosters) > 1:
-        logger.warning(f"multiple active rosters for {character_info.name!r}")
+        logger.warning(f"{character_info.name!r} 有 {len(active_rosters)} 个适用于此时的排班计划")
         audit = None
     else:
         audit = InfrastAudit.new(
