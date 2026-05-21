@@ -1,8 +1,8 @@
-from collections import UserList
+from collections import UserDict, UserList
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
-from itertools import permutations
+from itertools import chain, permutations
 from typing import Self
 
 from loguru import logger
@@ -29,68 +29,56 @@ class StationedOperatorInfo:
 
 class FacilityPresence(UserList[StationedOperatorInfo]):
     @classmethod
-    def from_single_skland_data(cls, data: dict, name_mapping: dict[str, str]) -> Self:
-        return cls(
-            [StationedOperatorInfo.from_skland_data(char, name_mapping) for char in data["chars"]]
-        )
-
-    @classmethod
-    def from_multiple_skland_data(cls, data: dict, name_mapping: dict[str, str]) -> list[Self]:
-        return [cls.from_single_skland_data(segment, name_mapping) for segment in data]
+    def from_skland_data(cls, data: list | dict, name_mapping: dict[str, str]) -> list[Self]:
+        if isinstance(data, dict):
+            data = [data]
+        return [
+            cls(
+                [
+                    StationedOperatorInfo.from_skland_data(char, name_mapping)
+                    for char in segment["chars"]
+                ]
+            )
+            for segment in data
+        ]
 
 
 class FacilityEnum(StrEnum):
-    CONTROL = "控制中枢"
-    POWER = "发电站"
-    TRADING = "贸易站"
-    MANUFACTURE = "制造站"
-    HIRE = "办公室"
-    MEETING = "会客室"
-    DORMITORIE = "宿舍"
+    control = "控制中枢"
+    power = "发电站"
+    trading = "贸易站"
+    manufacture = "制造站"
+    hire = "办公室"
+    meeting = "会客室"
+    dormitory = "宿舍"
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
-class InfrastBase[T]:
-    control: T
-    powers: list[T]
-    tradings: list[T]
-    manufactures: list[T]
-    hire: T
-    meeting: T
-    dormitories: list[T]
+maa_entry: dict[FacilityEnum, str] = {e: e.name for e in FacilityEnum}
+skland_entry: dict[FacilityEnum, str] = maa_entry | {
+    FacilityEnum.power: "powers",
+    FacilityEnum.trading: "tradings",
+    FacilityEnum.manufacture: "manufactures",
+    FacilityEnum.dormitory: "dormitories",
+}
 
+
+class InfrastBase[T](UserDict[FacilityEnum, list[T]]):
     def iter_facilities(self) -> Iterator[tuple[FacilityEnum, T]]:
-        yield FacilityEnum.CONTROL, self.control
-        for power in self.powers:
-            yield FacilityEnum.POWER, power
-        for trading in self.tradings:
-            yield FacilityEnum.TRADING, trading
-        for manufacture in self.manufactures:
-            yield FacilityEnum.MANUFACTURE, manufacture
-        yield FacilityEnum.HIRE, self.hire
-        yield FacilityEnum.MEETING, self.meeting
-        for dormitory in self.dormitories:
-            yield FacilityEnum.DORMITORIE, dormitory
+        for k, vs in self.items():
+            for v in vs:
+                yield k, v
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
 class InfrastPresence(InfrastBase[FacilityPresence]):
-    def __iter__(self) -> Iterator[StationedOperatorInfo]:
-        for _, facility_presence in self.iter_facilities():
-            yield from facility_presence
-
     @classmethod
     def from_character_info(cls, character_info: CharacterInfo) -> Self:
         data = character_info.player_info["building"]
         mapping = character_info.operator_name_mapping
         return cls(
-            control=FacilityPresence.from_single_skland_data(data["control"], mapping),
-            powers=FacilityPresence.from_multiple_skland_data(data["powers"], mapping),
-            tradings=FacilityPresence.from_multiple_skland_data(data["tradings"], mapping),
-            manufactures=FacilityPresence.from_multiple_skland_data(data["manufactures"], mapping),
-            hire=FacilityPresence.from_single_skland_data(data["hire"], mapping),
-            meeting=FacilityPresence.from_single_skland_data(data["meeting"], mapping),
-            dormitories=FacilityPresence.from_multiple_skland_data(data["dormitories"], mapping),
+            {
+                e: FacilityPresence.from_skland_data(data[skland_entry[e]], mapping)
+                for e in FacilityEnum
+            }
         )
 
 
@@ -135,75 +123,43 @@ class FacilityAudit:
     unexpected: list[StationedOperatorInfo]
 
     @classmethod
-    def from_single_facility(cls, roster: FacilityRoster, presence: FacilityPresence) -> Self:
-        expected = set(roster)
-        actual = set(operator.name for operator in presence)
-        # 保留在 roster 和 presence 中的顺序
-        return cls(
-            missing=[operator for operator in roster if operator not in actual],
-            present=[operator for operator in presence if operator.name in expected],
-            unexpected=[operator for operator in presence if operator.name not in expected],
-        )
-
-    @classmethod
-    def from_multiple_facilities(
+    def from_facility(
         cls, rosters: list[FacilityRoster], presences: list[FacilityPresence]
     ) -> list[Self]:
         return [
-            cls.from_single_facility(roster, presence)
+            cls(
+                missing=[
+                    operator
+                    for operator in roster
+                    if operator not in (operator.name for operator in presence)
+                ],
+                present=[operator for operator in presence if operator.name in roster],
+                unexpected=[operator for operator in presence if operator.name not in roster],
+            )
             for roster, presence in align_facilities(rosters, presences)
         ]
 
 
 class FacilityRoster(UserList[str]):
     @classmethod
-    def from_single_maa_roster(cls, data: dict) -> Self:
-        return cls(data["operators"])
-
-    @classmethod
-    def from_multiple_maa_roster(cls, data: dict) -> list[Self]:
-        return [cls.from_single_maa_roster(segment) for segment in data]
+    def from_maa_roster(cls, data: dict) -> list[Self]:
+        return [cls(segment["operators"]) for segment in data]
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
 class InfrastRoster(InfrastBase[FacilityRoster]):
     @classmethod
     def from_maa_roster(cls, config: dict) -> Self:
-        return cls(
-            control=FacilityRoster.from_single_maa_roster(config["control"][0]),
-            powers=FacilityRoster.from_multiple_maa_roster(config["power"]),
-            tradings=FacilityRoster.from_multiple_maa_roster(config["trading"]),
-            manufactures=FacilityRoster.from_multiple_maa_roster(config["manufacture"]),
-            hire=FacilityRoster.from_single_maa_roster(config["hire"][0]),
-            meeting=FacilityRoster.from_single_maa_roster(config["meeting"][0]),
-            dormitories=FacilityRoster.from_multiple_maa_roster(config["dormitory"]),
-        )
+        return cls({e: FacilityRoster.from_maa_roster(config[maa_entry[e]]) for e in FacilityEnum})
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
 class InfrastAudit(InfrastBase[FacilityAudit]):
     @classmethod
     def new(cls, infrast_presence: InfrastPresence, active_roster: InfrastRoster) -> Self:
         return cls(
-            control=FacilityAudit.from_single_facility(
-                active_roster.control, infrast_presence.control
-            ),
-            powers=FacilityAudit.from_multiple_facilities(
-                active_roster.powers, infrast_presence.powers
-            ),
-            tradings=FacilityAudit.from_multiple_facilities(
-                active_roster.tradings, infrast_presence.tradings
-            ),
-            manufactures=FacilityAudit.from_multiple_facilities(
-                active_roster.manufactures, infrast_presence.manufactures
-            ),
-            hire=FacilityAudit.from_single_facility(active_roster.hire, infrast_presence.hire),
-            meeting=FacilityAudit.from_single_facility(
-                active_roster.meeting, infrast_presence.meeting
-            ),
-            dormitories=FacilityAudit.from_multiple_facilities(
-                active_roster.dormitories, infrast_presence.dormitories
-            ),
+            {
+                e: FacilityAudit.from_facility(active_roster[e], infrast_presence[e])
+                for e in FacilityEnum
+            }
         )
 
 
@@ -224,7 +180,7 @@ class FiammettaMonitor:
         present = []
         fiammetta = None
         fiammetta_recover_at = None
-        for operator in infrast_presence:
+        for operator in chain.from_iterable(v for _, v in infrast_presence.iter_facilities()):
             if operator.name in fiammetta_releated:
                 present.append(operator)
                 fiammetta_releated.remove(operator.name)
