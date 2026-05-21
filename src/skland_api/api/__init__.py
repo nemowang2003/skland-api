@@ -8,18 +8,26 @@ from typing import Literal, Never
 
 import httpx
 
+from .sm import get_d_id
+
 APP_CODE = "4ca99fa6b56cc2ba"  # magic code
+DID = get_d_id()
 
 
 class SklandApiException(Exception):
-    def __init__(self, code: int, msg: str, response: httpx.Response):
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        response: httpx.Response,
+    ):
         self.code = code
         self.msg = msg
         self.response = response
 
     def __str__(self):
         url = urllib.parse.unquote(str(self.response.url))
-        return f"[{self.response.request.method} {url}] ({self.code}) {self.msg}"
+        return f"[{self.response.request.method}] {url} ({self.code}) {self.msg}"
 
 
 class SklandClientAuth(httpx.Auth):
@@ -39,14 +47,18 @@ class SklandClientAuth(httpx.Auth):
             payload = request.content.decode("utf-8")
 
         timestamp = str(int(time.time()))
+        header = {
+            "platform": "3",
+            "timestamp": timestamp,
+            "dId": DID,
+            "vName": "1.0.0",
+        }
         payload_to_sign = "".join(
             [
                 path,
                 payload,
                 timestamp,
-                '{"platform":"","timestamp":"',
-                timestamp,
-                '","dId":"","vName":""}',
+                json.dumps(header, separators=(",", ":")),
             ]
         )
         encrypted = hmac.new(
@@ -54,16 +66,9 @@ class SklandClientAuth(httpx.Auth):
             payload_to_sign.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
+
         sign = hashlib.md5(encrypted.encode("utf-8")).hexdigest()
-        request.headers.update(
-            {
-                "sign": sign,
-                "platform": "",
-                "timestamp": timestamp,
-                "dId": "",
-                "vName": "",
-            }
-        )
+        request.headers.update({"sign": sign} | header)
         yield request
 
 
@@ -74,9 +79,10 @@ class SklandClient:
         self.client = httpx.AsyncClient(
             auth=SklandClientAuth(),
             headers={
-                "User-Agent": "Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0",
+                "User-Agent": "Mozilla/5.0 (Linux; Android 12; SM-A5560 Build/V417IR; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/101.0.4951.61 Safari/537.36; SKLand/1.52.1",
                 "Accept-Encoding": "gzip",
                 "Connection": "close",
+                "X-Requested-With": "com.hypergryph.skland",
             },
         )
 
@@ -96,7 +102,7 @@ class SklandClient:
 
     @property
     def token(self) -> Never:
-        raise AttributeError(f"cannot read attribute 'token' from {self.__class__.__name__!r}")
+        raise AttributeError(f"'{self.__class__.__name__}.token' 是只写的")
 
     @token.setter
     def token(self, token: str):
@@ -105,7 +111,7 @@ class SklandClient:
     async def request(self, method: Literal["GET", "POST"], url: str, **kwargs):
         response = await self.client.request(method, url, **kwargs)
         try:
-            response = response.json()
+            data = response.json()
         except json.JSONDecodeError:
             preview = response.text[:50].replace("\n", " ")
             raise SklandApiException(
@@ -113,14 +119,14 @@ class SklandClient:
                 msg=f"响应解析失败(非json): {preview}",
                 response=response,
             ) from None
-        code = response.get("status", 0) or response.get("code", 0)
+        code = data.get("status", 0) or data.get("code", 0)
         if code != 0:
             raise SklandApiException(
                 code=code,
-                msg=response.get("msg") or response.get("message", ""),
+                msg=data.get("msg") or data.get("message", ""),
                 response=response,
             )
-        return response
+        return data
 
     async def get(self, url: str, **kwargs) -> dict:
         return await self.request("GET", url, **kwargs)
