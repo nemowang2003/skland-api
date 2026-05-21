@@ -59,6 +59,27 @@ skland dashboard --names 账号A,账号B
 skland dashboard --modules sanity,recruit
 ```
 
+### 4. 配置账号认证
+
+使用 `auth add` 为一个账号写入认证信息：
+
+```bash
+skland auth add <账号名称>
+```
+
+认证信息会以明文 JSON 的形式保存在配置文件同级的 `auth/` 目录中，例如：
+
+```text
+~/.config/skland-api/skland-api.toml
+~/.config/skland-api/auth/<账号名称>.json
+```
+
+使用 `auth remove` 移除账号认证信息：
+
+```bash
+skland auth remove <账号名称>
+```
+
 ---
 
 ## 作为库使用

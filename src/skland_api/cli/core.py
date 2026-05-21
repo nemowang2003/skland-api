@@ -11,69 +11,116 @@ from typing import TYPE_CHECKING, ClassVar, Concatenate
 
 import platformdirs
 import rich_click as click
+import tomlkit
+from click import ClickException
 from click.core import ParameterSource
+from loguru import logger
 from rich.console import Console
+
+from skland_api.models import AuthInfo
 
 APPNAME = "skland-api"
 console = Console()
 
 
+class AuthFailure(ClickException):
+    pass
+
+
+def get_auth_file(auth_dir: Path, username: str) -> Path:
+    return auth_dir / f"{username}.json"
+
+
+def load_auth_info(auth_dir: Path, username: str) -> AuthInfo:
+    auth_file = get_auth_file(auth_dir, username)
+    if not auth_file.exists():
+        raise AuthFailure(f"用户 {username!r} 的认证文件不存在: {auth_file}")
+    try:
+        with auth_file.open(encoding="utf-8") as fp:
+            data = json.load(fp)
+    except (OSError, ValueError) as e:
+        raise AuthFailure(f"用户 {username!r} 的认证文件读取失败: {e}")
+
+    if not isinstance(data, dict):
+        raise AuthFailure(f"用户 {username!r} 的认证文件格式错误")
+
+    try:
+        return AuthInfo(
+            phone=data.get("phone"),
+            password=data.get("password"),
+            token=data.get("token"),
+            cred=data.get("cred"),
+        )
+    except ValueError as e:
+        raise AuthFailure(f"用户 {username!r} 的认证文件格式错误: {e}")
+
+
+def save_auth_info(auth_dir: Path, username: str, auth_info: AuthInfo) -> None:
+    auth_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    auth_file = get_auth_file(auth_dir, username)
+    with auth_file.open(mode="w", encoding="utf-8") as fp:
+        json.dump(auth_info.to_dict(), fp, ensure_ascii=False, indent=2)
+        fp.write("\n")
+    auth_file.chmod(0o600)
+
+
+def remove_auth_info(auth_dir: Path, username: str) -> bool:
+    auth_file = get_auth_file(auth_dir, username)
+    if not auth_file.exists():
+        return False
+    auth_file.unlink()
+    return True
+
+
+def list_auth_users(auth_dir: Path) -> set[str]:
+    return {path.stem for path in auth_dir.glob("*.json") if path.is_file()}
+
+
 @dataclass(frozen=True, kw_only=True, slots=True)
 class GlobalOption:
-    auth_file: Path
-    auth: dict
-    config: dict
+    config_file: Path
+    config_content: tomlkit.TOMLDocument
     cache_dir: Path
     log_file: Path
+    auth_dir: Path
+
+    def writeback(self):
+        with self.config_file.open(mode="w", encoding="utf-8") as fp:
+            fp.write(self.config_content.as_string())
 
 
 @dataclass(slots=True)
 class GlobalOptionBuilder:
     click_options: ClassVar = [
         click.RichOption(
-            ["--config-dir"],
-            envvar="SKLAND_API_CONFIG_DIR",
-            show_envvar=True,
-            type=click.Path(path_type=Path),
-            default=lambda: platformdirs.user_config_path(APPNAME, ensure_exists=True),
-            help="配置文件存放目录",
-        ),
-        click.RichOption(
             ["--cache-dir"],
             envvar="SKLAND_API_CACHE_DIR",
             show_envvar=True,
-            type=click.Path(path_type=Path),
-            default=lambda: platformdirs.user_cache_path(APPNAME, ensure_exists=True),
+            type=click.Path(path_type=Path, file_okay=False, resolve_path=True),
+            default=lambda: platformdirs.user_cache_path(APPNAME),
             help="缓存文件存放目录",
-        ),
-        click.RichOption(
-            ["--auth-file"],
-            envvar="SKLAND_API_AUTH_FILE",
-            show_envvar=True,
-            type=click.Path(path_type=Path),
-            help="认证信息文件 (auth.json) 的具体路径",
         ),
         click.RichOption(
             ["--config-file"],
             envvar="SKLAND_API_CONFIG_FILE",
             show_envvar=True,
-            type=click.Path(path_type=Path),
-            help="配置文件 (config.json) 的具体路径",
+            type=click.Path(path_type=Path, dir_okay=False, resolve_path=True),
+            default=lambda: platformdirs.user_config_path(APPNAME) / f"{APPNAME}.toml",
+            help=f"配置文件 ({APPNAME}.toml) 的路径",
         ),
         click.RichOption(
             ["--log-file"],
             envvar="SKLAND_API_LOG_FILE",
             show_envvar=True,
-            type=click.Path(path_type=Path),
-            help="日志文件的输出路径",
+            type=click.Path(path_type=Path, dir_okay=False, resolve_path=True),
+            help=f"日志文件 ({APPNAME}.log) 的路径",
         ),
     ]
 
-    config_dir: Path | None = None
-    auth_file: Path | None = None
     config_file: Path | None = None
     cache_dir: Path | None = None
     log_file: Path | None = None
+    auth_dir: Path | None = None
 
     def set(self, k: str, v) -> None:
         setattr(self, k, v)
@@ -82,47 +129,65 @@ class GlobalOptionBuilder:
         if getattr(self, k) is None:
             setattr(self, k, v)
 
+    @staticmethod
+    def sync_auth_and_config(auth_dir: Path, config_content: tomlkit.TOMLDocument) -> bool:
+        config_users = set(config_content.keys())
+        auth_users = list_auth_users(auth_dir)
+
+        only_in_config = sorted(config_users - auth_users)
+        only_in_auth = sorted(auth_users - config_users)
+
+        if only_in_config:
+            logger.warning(
+                f"config 中存在但 auth 中不存在的账号: {', '.join(repr(x) for x in only_in_config)}"
+            )
+
+        if only_in_auth:
+            logger.warning(
+                f"auth 中存在但 config 中不存在的账号: {', '.join(repr(x) for x in only_in_auth)}"
+            )
+            for username in only_in_auth:
+                config_content[username] = tomlkit.table()
+            return True
+
+        return False
+
     def build(self) -> GlobalOption:
-        if self.config_dir is None:
-            raise RuntimeError("未设置 config_dir")
-        config_dir = self.config_dir.expanduser().resolve()
-        if not config_dir.is_dir():
-            raise NotADirectoryError(config_dir)
         if self.cache_dir is None:
-            raise ValueError("未设置 cache_dir")
-        cache_dir = self.cache_dir.expanduser().resolve()
-        if not cache_dir.is_dir():
-            raise NotADirectoryError(cache_dir)
+            self.cache_dir = platformdirs.user_cache_path(APPNAME, ensure_exists=True)
 
-        if self.auth_file is not None:
-            auth_file = self.auth_file.expanduser().resolve()
-        else:
-            auth_file = config_dir / "auth.json"
-        if not auth_file.exists():
-            raise NotImplementedError
-        with auth_file.open(encoding="utf-8") as fp:
-            auth = json.load(fp)
+        if self.config_file is None:
+            self.config_file = (
+                platformdirs.user_config_path(APPNAME, ensure_exists=True) / f"{APPNAME}.toml"
+            )
 
-        if self.config_file is not None:
-            config_file = self.config_file.expanduser().resolve()
-        else:
-            config_file = config_dir / "config.json"
-        if not config_file.exists():
-            raise NotImplementedError
-        with config_file.open(encoding="utf-8") as fp:
-            config = json.load(fp)
+        if self.log_file is None:
+            self.log_file = self.cache_dir / f"{APPNAME}.log"
 
-        if self.log_file is not None:
-            log_file = self.log_file.expanduser().resolve()
+        if self.auth_dir is None:
+            self.auth_dir = self.config_file.parent / "auth"
+
+        self.auth_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+        if not self.config_file.exists():
+            self.config_file.touch(0o600)
+            config_content = tomlkit.TOMLDocument()
         else:
-            log_file = cache_dir / f"{APPNAME}.log"
+            with self.config_file.open(encoding="utf-8") as fp:
+                config_content = tomlkit.parse(fp.read())
+
+        should_writeback = self.sync_auth_and_config(self.auth_dir, config_content)
+
+        if should_writeback:
+            with self.config_file.open(mode="w", encoding="utf-8") as fp:
+                fp.write(config_content.as_string())
 
         return GlobalOption(
-            auth_file=auth_file,
-            auth=auth,
-            config=config,
-            cache_dir=cache_dir,
-            log_file=log_file,
+            config_file=self.config_file,
+            config_content=config_content,
+            cache_dir=self.cache_dir,
+            log_file=self.log_file,
+            auth_dir=self.auth_dir,
         )
 
 
@@ -233,10 +298,9 @@ class SklandCommand(Mixin, click.RichCommand):
     @staticmethod
     def wrap_async[**P, R](f) -> CommandInput[P, R]:
         """
-        将实际定义时的 (async) def command(global_option: GlobalOption, option1, option2, ...)
-        转化成标准的同步格式
-        def command(global_option: GlobalOption, **kwargs)
         如果原本是 async 的，使用 asyncio.run 包一层
+        将实际定义时的 async def f(global_option: GlobalOption, **kwargs)
+        转化成标准的同步格式 def f(global_option: GlobalOption, **kwargs)
         """
         if not inspect.iscoroutinefunction(f):
             return f
@@ -259,8 +323,9 @@ class SklandCommand(Mixin, click.RichCommand):
 
         @functools.wraps(f)
         def inner(ctx: click.Context, **kwargs) -> R:
-            builder = ctx.ensure_object(GlobalOptionBuilder)
-            return f(builder.build(), **kwargs)
+            global_option = ctx.ensure_object(GlobalOptionBuilder).build()
+            logger.add(global_option.log_file)
+            return f(global_option, **kwargs)
 
         return inner
 
