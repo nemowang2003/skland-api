@@ -4,6 +4,7 @@ import json
 import time
 import urllib.parse
 from collections.abc import Generator
+from functools import cache
 from typing import Literal, Never
 
 import httpx
@@ -11,7 +12,11 @@ import httpx
 from .sm import get_d_id
 
 APP_CODE = "4ca99fa6b56cc2ba"  # magic code
-DID = get_d_id()
+
+
+@cache
+def get_cached_d_id() -> str:
+    return get_d_id()
 
 
 class SklandApiException(Exception):
@@ -50,7 +55,7 @@ class SklandClientAuth(httpx.Auth):
         header = {
             "platform": "3",
             "timestamp": timestamp,
-            "dId": DID,
+            "dId": get_cached_d_id(),
             "vName": "1.0.0",
         }
         payload_to_sign = "".join(
