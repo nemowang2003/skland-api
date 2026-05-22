@@ -21,11 +21,6 @@
 | `mission`            | 任务进度：每日任务与每周任务进度。                                 |
 | `recruit`            | 公开招募：各栏位招募剩余时间、刷新次数及下一次刷新时间。           |
 | `infrast_basic`      | 基建概览：无人机数量、疲劳干员提醒、正在进行的技能专精进度。       |
-
-扩展模块如下：
-
-| 模块名               | 描述                                                               |
-| :---                 | :---                                                               |
 | `infrast_assignment` | 基建审计（需配置 MAA 排班表）：排班表检查与菲亚梅塔位置/心情监控。 |
 
 ---
@@ -44,10 +39,10 @@ skland dashboard
 
 ### 2. 筛选特定账号
 
-如果你配置了多个账号，可以通过 `--names` 指定仅查看其中几个：
+如果你配置了多个账号，可以通过 `--users` 指定仅查看其中几个：
 
 ```bash
-skland dashboard --names 账号A,账号B
+skland dashboard --users 账号A,账号B
 ```
 
 ### 3. 自定义模块展示
@@ -82,14 +77,7 @@ skland auth remove <name>
 
 ### 5. 配置模块
 
-每个账号在 `skland-api.toml` 中对应一个独立的 table。默认会启用内置模块；如果需要额外启用扩展模块，可以使用 `extra-modules`：
-
-```toml
-[<name>]
-extra-modules = ["infrast_assignment"]
-```
-
-也可以直接使用 `all-modules` 完全覆盖默认模块列表：
+每个账号在 `skland-api.toml` 中对应一个独立的 table。默认会启用上面列出的全部模块；如果需要调整模块列表，可以使用 `all-modules` 完全覆盖默认值：
 
 ```toml
 [<name>]
@@ -99,9 +87,6 @@ all-modules = ["profile", "sanity", "infrast_assignment"]
 部分模块如`infrast_assignment`支持额外配置：
 
 ```toml
-[<name>]
-extra-modules = ["infrast_assignment"]
-
 [<name>.module.infrast_assignment]
 path = "/path/to/maa-roster.json"
 ```

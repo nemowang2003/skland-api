@@ -208,8 +208,10 @@ class InfrastAssignmentReport:
 
 
 def main(character_info: CharacterInfo, config: dict | None) -> InfrastAssignmentReport:
-    if config is None or (path := config.get("path")) is None:
-        logger.warning(f"no path configured for {character_info.name!r}")
+    if config is None:
+        return InfrastAssignmentReport()
+    if (path := config.get("path")) is None:
+        logger.warning(f"{character_info.name!r} 的 module.infrast_assigment 没有配置 'path'")
         return InfrastAssignmentReport()
 
     from pathlib import Path

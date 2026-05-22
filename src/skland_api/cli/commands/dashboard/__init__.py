@@ -52,7 +52,6 @@ def toml_field(key: str | None = None, default_factory=lambda: None):
 
 class UserConfig:
     enabled: bool = toml_field(default_factory=lambda: True)
-    extra_modules: list[str] | None = toml_field(key="extra-modules")
     all_modules: list[str] | None = toml_field(key="all-modules")
 
     def __init__(self, name: str, table: Table):
@@ -88,6 +87,7 @@ class DashBoardLauncher:
         "mission",
         "recruit",
         "infrast_basic",
+        "infrast_assignment",
     ]
     all_module_task: list[list[ModuleTask]]
     async_tasks: list[ModuleTask]
@@ -146,18 +146,10 @@ class DashBoardLauncher:
         for user in self.users_to_run:
             config = self.get_user_config(user)
             all_modules = config.all_modules
-            extra_modules = config.extra_modules
             if all_modules is not None:
                 modules.update(all_modules)
-                if extra_modules is not None:
-                    logger.warning(
-                        f"{user!r}同时配置了 all-modules 和 extra-modules。"
-                        "extra-modules 的值将被忽略"
-                    )
             else:
                 modules.update(self.DEFAULT_MODULES)
-            if extra_modules is not None:
-                modules.update(extra_modules)
         return modules
 
     @cached_property
@@ -218,9 +210,7 @@ class DashBoardLauncher:
             module_tasks: list[ModuleTask] = []
             for character_info in character_infos:
                 config = self.get_user_config(user)
-                modules_to_run = config.all_modules or self.DEFAULT_MODULES + (
-                    config.extra_modules or []
-                )
+                modules_to_run = config.all_modules or self.DEFAULT_MODULES
                 for module_name in modules_to_run:
                     module = self.module_registry.get(module_name)
                     if module is None:
