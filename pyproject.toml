@@ -5,6 +5,7 @@ description = "An unofficial Python API client and CLI dashboard for Skland (Ark
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "cryptography>=46.0.5",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
 ]
@@ -20,13 +21,13 @@ cli = [
     "platformdirs>=4.3.8",
     "rich>=14.2.0",
     "rich-click>=1.9.4",
-    "wcwidth>=0.2.13",
+    "tomlkit>=0.14.0",
 ]
 
 [dependency-groups]
 dev = [
     "pre-commit>=4.5.0",
-    "ty>=0.0.8",
+    "ty>=0.0.12",
 ]
 
 [build-system]
@@ -38,7 +39,7 @@ target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]
-extend-ignore = ["E501"]
+ignore = ["E501"]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
