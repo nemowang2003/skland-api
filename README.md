@@ -64,21 +64,49 @@ skland dashboard --modules sanity,recruit
 使用 `auth add` 为一个账号写入认证信息：
 
 ```bash
-skland auth add <账号名称>
+skland auth add <name>
 ```
 
 认证信息会以明文 JSON 的形式保存在配置文件同级的 `auth/` 目录中，例如：
 
 ```text
 ~/.config/skland-api/skland-api.toml
-~/.config/skland-api/auth/<账号名称>.json
+~/.config/skland-api/auth/<name>.json
 ```
 
 使用 `auth remove` 移除账号认证信息：
 
 ```bash
-skland auth remove <账号名称>
+skland auth remove <name>
 ```
+
+### 5. 配置模块
+
+每个账号在 `skland-api.toml` 中对应一个独立的 table。默认会启用内置模块；如果需要额外启用扩展模块，可以使用 `extra-modules`：
+
+```toml
+[<name>]
+extra-modules = ["infrast_assignment"]
+```
+
+也可以直接使用 `all-modules` 完全覆盖默认模块列表：
+
+```toml
+[<name>]
+all-modules = ["profile", "sanity", "infrast_assignment"]
+```
+
+部分模块如`infrast_assignment`支持额外配置：
+
+```toml
+[<name>]
+extra-modules = ["infrast_assignment"]
+
+[<name>.module.infrast_assignment]
+path = "/path/to/maa-roster.json"
+```
+
+这里的键需要与 `skland auth add <name>` 中使用的账号名称一致。如果一个账号下绑定了多个明日方舟角色，它们会共用同一份 `infrast_assignment` 配置。
 
 ---
 

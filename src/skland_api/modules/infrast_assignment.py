@@ -208,7 +208,7 @@ class InfrastAssignmentReport:
 
 
 def main(character_info: CharacterInfo, config: dict | None) -> InfrastAssignmentReport:
-    if config is None or (path := config.get(character_info.name)) is None:
+    if config is None or (path := config.get("path")) is None:
         logger.warning(f"no path configured for {character_info.name!r}")
         return InfrastAssignmentReport()
 

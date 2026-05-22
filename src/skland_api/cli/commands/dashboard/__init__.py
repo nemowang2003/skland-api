@@ -1,11 +1,10 @@
 import asyncio
 import functools
 import importlib
-import typing
 from collections.abc import Coroutine
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Callable
+from typing import Any, Callable
 
 import rich_click as click
 from loguru import logger
@@ -25,7 +24,7 @@ from .formatter import render
 
 
 class TomlField:
-    def __init__(self, key: str | None, default_factory: Callable[[], ...]):
+    def __init__(self, key: str | None, default_factory: Callable[[], Any]):
         self.key = key
         self.default_factory = default_factory
 
@@ -237,7 +236,6 @@ class DashBoardLauncher:
             self.async_tasks,
             await asyncio.gather(*self.coroutines, return_exceptions=True),
         ):
-            task = typing.cast(ModuleTask, task)
             task.entry = functools.partial(return_result, result)
 
 
