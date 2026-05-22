@@ -47,7 +47,7 @@ def get_input(
 )
 @click.option("--force", is_flag=True, default=False, help="允许强制覆盖原有的认证信息")
 async def auth_add(
-    global_opiton: GlobalOption,
+    global_option: GlobalOption,
     username: str | None,
     phone: str | None,
     password: str | None,
@@ -62,11 +62,11 @@ async def auth_add(
             ctx.fail("在非交互模式 (--no-interactive) 下，必须提供 USERNAME 参数")
         username = click.prompt("skland-api 用户标识符")
 
-    global_opiton.config_content.setdefault(username, tomlkit.table())
-    if not isinstance(global_opiton.config_content.item(username), Table):
-        global_opiton.config_content[username] = tomlkit.table()
+    global_option.config_content.setdefault(username, tomlkit.table())
+    if not isinstance(global_option.config_content.item(username), Table):
+        global_option.config_content[username] = tomlkit.table()
 
-    if not force and get_auth_file(global_opiton.auth_dir, username).exists():
+    if not force and get_auth_file(global_option.auth_dir, username).exists():
         raise click.ClickException("该用户已存在，使用 --force 以强制覆盖")
 
     if interactive:
@@ -88,10 +88,10 @@ async def auth_add(
         )
         await auth_info.full_auth()
     except ValueError as e:
-        raise click.ClickException(*e.args)
+        raise click.ClickException(str(e))
 
-    save_auth_info(global_opiton.auth_dir, username, auth_info)
-    global_opiton.writeback()
+    save_auth_info(global_option.auth_dir, username, auth_info)
+    global_option.writeback()
 
 
 @skland_command(name="remove")

@@ -28,7 +28,7 @@ logger.remove()
 try:
     __version__ = importlib.metadata.version(APPNAME)
 except Exception:
-    __version = "unknown"
+    __version__ = "unknown"
 
 click.rich_click.USE_RICH_MARKUP = True
 click.rich_click.SHOW_ARGUMENTS = True

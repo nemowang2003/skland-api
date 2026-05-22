@@ -155,6 +155,7 @@ class GlobalOptionBuilder:
     def build(self) -> GlobalOption:
         if self.cache_dir is None:
             self.cache_dir = platformdirs.user_cache_path(APPNAME, ensure_exists=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         if self.config_file is None:
             self.config_file = (

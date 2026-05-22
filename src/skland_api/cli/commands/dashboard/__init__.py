@@ -16,6 +16,7 @@ from skland_api.cli.core import (
     GlobalOption,
     console,
     load_auth_info,
+    save_auth_info,
     skland_command,
 )
 from skland_api.models import CharacterInfo, CharacterInfoLoader
@@ -131,13 +132,19 @@ class DashBoardLauncher:
             return self.users
         return [config.name for config in self.user_config.values() if config.enabled]
 
+    def get_user_config(self, user: str) -> UserConfig:
+        config = self.user_config.get(user)
+        if config is None:
+            raise click.ClickException(f"用户 {user!r} 不存在于配置文件中")
+        return config
+
     @cached_property
     def modules_to_load(self) -> set[str]:
         if self.modules is not None:
             return set(self.modules)
         modules = set()
         for user in self.users_to_run:
-            config = self.user_config[user]
+            config = self.get_user_config(user)
             all_modules = config.all_modules
             extra_modules = config.extra_modules
             if all_modules is not None:
@@ -175,6 +182,7 @@ class DashBoardLauncher:
         try:
             auth_info = load_auth_info(self.global_option.auth_dir, user)
             api = await auth_info.full_auth()
+            save_auth_info(self.global_option.auth_dir, user, auth_info)
         except AuthFailure as e:
             logger.error(f"{user!r} 认证信息无效: {e.format_message()}")
             return []
@@ -209,12 +217,15 @@ class DashBoardLauncher:
         for user, character_infos in zip(self.users_to_run, all_character_info):
             module_tasks: list[ModuleTask] = []
             for character_info in character_infos:
-                config = self.user_config[user]
+                config = self.get_user_config(user)
                 modules_to_run = config.all_modules or self.DEFAULT_MODULES + (
                     config.extra_modules or []
                 )
                 for module_name in modules_to_run:
-                    module = self.module_registry[module_name]
+                    module = self.module_registry.get(module_name)
+                    if module is None:
+                        logger.error(f"module {module_name!r} 未加载成功，已跳过")
+                        continue
                     module_task = ModuleTask(
                         user_name=user,
                         module_name=module_name,

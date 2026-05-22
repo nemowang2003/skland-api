@@ -33,6 +33,7 @@ import hashlib
 import json
 import time
 import uuid
+from json import JSONDecodeError
 
 import httpx
 from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
@@ -213,21 +214,37 @@ def get_d_id():
 
     des_result = _AES(GZIP(_DES(des_target)), priId.encode("utf-8"))
 
-    response = httpx.post(
-        devices_info_url,
-        json={
-            "appId": "default",
-            "compress": 2,
-            "data": des_result,
-            "encode": 5,
-            "ep": ep,
-            "organization": SM_CONFIG["organization"],
-            "os": "web",  # 固定值
-        },
-    )
+    try:
+        response = httpx.post(
+            devices_info_url,
+            json={
+                "appId": "default",
+                "compress": 2,
+                "data": des_result,
+                "encode": 5,
+                "ep": ep,
+                "organization": SM_CONFIG["organization"],
+                "os": "web",  # 固定值
+            },
+            timeout=10.0,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"did计算请求失败: {e}") from e
 
-    resp = response.json()
-    if resp["code"] != 1100:
-        raise Exception("did计算失败，请联系作者")
+    try:
+        resp = response.json()
+    except JSONDecodeError as e:
+        raise RuntimeError(f"did计算响应格式错误: {response.text[:200]}") from e
+
+    if not isinstance(resp, dict):
+        raise RuntimeError(f"did计算响应类型错误: {type(resp).__name__}")
+
+    if resp.get("code") != 1100:
+        raise RuntimeError(f"did计算失败: code={resp.get('code')}")
+
+    detail = resp.get("detail")
+    if not isinstance(detail, dict) or not isinstance(detail.get("deviceId"), str):
+        raise RuntimeError("did计算失败: 响应中缺少 detail.deviceId")
     # 开头必须是B
     return "B" + resp["detail"]["deviceId"]

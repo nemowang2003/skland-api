@@ -126,23 +126,23 @@ class FacilityAudit:
     def from_facility(
         cls, rosters: list[FacilityRoster], presences: list[FacilityPresence]
     ) -> list[Self]:
-        return [
-            cls(
-                missing=[
-                    operator
-                    for operator in roster
-                    if operator not in (operator.name for operator in presence)
-                ],
-                present=[operator for operator in presence if operator.name in roster],
-                unexpected=[operator for operator in presence if operator.name not in roster],
+        audits = []
+        for roster, presence in align_facilities(rosters, presences):
+            expected = set(roster)
+            actual = set(operator.name for operator in presence)
+            audits.append(
+                cls(
+                    missing=[operator for operator in roster if operator not in actual],
+                    present=[operator for operator in presence if operator.name in expected],
+                    unexpected=[operator for operator in presence if operator.name not in expected],
+                )
             )
-            for roster, presence in align_facilities(rosters, presences)
-        ]
+        return audits
 
 
 class FacilityRoster(UserList[str]):
     @classmethod
-    def from_maa_roster(cls, data: dict) -> list[Self]:
+    def from_maa_roster(cls, data: list[dict]) -> list[Self]:
         return [cls(segment["operators"]) for segment in data]
 
 
