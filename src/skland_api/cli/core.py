@@ -174,8 +174,11 @@ class GlobalOptionBuilder:
             self.config_file.touch(0o600)
             config_content = tomlkit.TOMLDocument()
         else:
-            with self.config_file.open(encoding="utf-8") as fp:
-                config_content = tomlkit.parse(fp.read())
+            try:
+                with self.config_file.open(encoding="utf-8") as fp:
+                    config_content = tomlkit.parse(fp.read())
+            except Exception as e:
+                raise ClickException(f"配置文件解析失败: {self.config_file}: {e}") from e
 
         should_writeback = self.sync_auth_and_config(self.auth_dir, config_content)
 

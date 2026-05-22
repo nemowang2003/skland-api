@@ -34,7 +34,9 @@ class TomlField:
             self.key = name
 
     def __get__(self, obj, objtype):
-        return obj._table.get(self.key, self.default_factory())
+        if self.key in obj._table:
+            return obj._table[self.key]
+        return self.default_factory()
 
     def __set__(self, obj, value):
         if value is None:
